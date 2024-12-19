@@ -96,8 +96,9 @@ public:
     [[nodiscard]] std::string to_source() const override;
 
 private:
+    std::string type_before_;
     std::string name_;
-    std::string type_;
+    std::string type_after_;
     std::optional<std::size_t> member_location_;
     bool is_static{false};
     std::optional<std::int64_t> default_value_;

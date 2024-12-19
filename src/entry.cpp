@@ -3,11 +3,11 @@
 #include <iomanip>
 #include <sstream>
 
-#include <llvm/DebugInfo/DWARF/DWARFTypePrinter.h>
 #include <llvm/Demangle/Demangle.h>
 #include <spdlog/spdlog.h>
 
 #include "algorithm.hpp"
+#include "type_printer.h"
 
 namespace {
 std::string to_string(llvm::dwarf::AccessAttribute a)
@@ -111,8 +111,8 @@ void Function::parse(const llvm::DWARFDie &die)
                         type.isValid() && type.getTag() == llvm::dwarf::DW_TAG_const_type) {
                         is_const_ = true;
                     }
-                    is_static_ = false;
                 }
+                is_static_ = false;
             }
             else {
                 auto &param = parameters_.emplace_back();
@@ -125,7 +125,6 @@ void Function::parse(const llvm::DWARFDie &die)
             // TODO: template params
             break;
         }
-        first_param = false;
     }
 }
 
@@ -138,7 +137,7 @@ std::string Function::to_source() const
     if (virtuality_ > llvm::dwarf::DW_VIRTUALITY_none) {
         ss << "virtual ";
     }
-    if (!startswith(name_, "operator ")) {
+    if (!linkage_name_.empty() && !startswith(name_, "operator ")) {
         ss << return_type_ << " ";
     }
     if (is_explicit_) {
@@ -213,9 +212,19 @@ void Field::parse(const llvm::DWARFDie &die)
     }
     if (auto type = die.getAttributeValueAsReferencedDie(llvm::dwarf::DW_AT_type); type.isValid()) {
         type = type.resolveTypeUnitReference();
-        llvm::raw_string_ostream os(type_);
-        llvm::DWARFTypePrinter type_printer(os);
-        type_printer.appendQualifiedName(type);
+        llvm::DWARFDie inner;
+        // before name
+        {
+            llvm::raw_string_ostream os(type_before_);
+            llvm::DWARFTypePrinter type_printer(os);
+            inner = type_printer.appendQualifiedNameBefore(type);
+        }
+        // after name
+        {
+            llvm::raw_string_ostream os(type_after_);
+            llvm::DWARFTypePrinter type_printer(os);
+            type_printer.appendUnqualifiedNameAfter(type, inner);
+        }
     }
     if (auto attr = die.find(llvm::dwarf::DW_AT_data_member_location); attr.has_value()) {
         member_location_ = attr->getAsUnsignedConstant().value();
@@ -239,15 +248,15 @@ std::string Field::to_source() const
     if (is_static) {
         ss << "static ";
     }
-    ss << type_ << " " << name_;
+    ss << type_before_ << " " << name_ << type_after_;
     if (default_value_.has_value()) {
         ss << " = ";
-        if (endswith(type_, "float")) {
+        if (endswith(type_before_, "float")) {
             auto value = static_cast<std::int32_t>(default_value_.value());
             constexpr auto max_precision{std::numeric_limits<float>::digits10 + 1};
             ss << std::fixed << std::setprecision(max_precision) << *reinterpret_cast<float *>(&value);
         }
-        else if (endswith(type_, "double")) {
+        else if (endswith(type_before_, "double")) {
             auto value = default_value_.value();
             constexpr auto max_precision{std::numeric_limits<double>::digits10 + 1};
             ss << std::fixed << std::setprecision(max_precision) << *reinterpret_cast<double *>(&value);

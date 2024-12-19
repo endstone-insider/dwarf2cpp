@@ -10,5 +10,6 @@ add_executable(dwarf2cpp src/main.cpp
         src/entry.h
         src/source_file.cpp
         src/source_file.h
+        src/type_printer.cpp
         src/type_printer.h)
 target_link_libraries(dwarf2cpp argparse::argparse llvm-core::llvm-core spdlog::spdlog)
