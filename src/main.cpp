@@ -46,6 +46,18 @@ void parse_children(const llvm::DWARFDie &die,
 
         std::unique_ptr<dwarf2cpp::Entry> entry;
         switch (tag) {
+        case llvm::dwarf::DW_TAG_class_type: {
+            entry = std::make_unique<dwarf2cpp::Struct>(true);
+            break;
+        }
+        case llvm::dwarf::DW_TAG_enumeration_type: {
+            entry = std::make_unique<dwarf2cpp::Enum>(namespaces);
+            break;
+        }
+        case llvm::dwarf::DW_TAG_structure_type: {
+            entry = std::make_unique<dwarf2cpp::Struct>(false);
+            break;
+        }
         case llvm::dwarf::DW_TAG_typedef: {
             entry = std::make_unique<dwarf2cpp::Typedef>(namespaces);
             break;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <optional>
 #include <string>
 #include <vector>
@@ -13,15 +14,20 @@ public:
     using namespace_list = std::vector<std::string>;
     explicit Entry(namespace_list namespaces = {}) : namespaces_(std::move(namespaces)){};
     virtual ~Entry() = default;
-    virtual void parse(const llvm::DWARFDie &die) = 0;
+    virtual void parse(const llvm::DWARFDie &die);
     [[nodiscard]] virtual std::string to_source() const = 0;
     [[nodiscard]] namespace_list namespaces() const
     {
         return namespaces_;
     }
+    [[nodiscard]] std::optional<llvm::dwarf::AccessAttribute> access() const
+    {
+        return access_;
+    }
 
 private:
     namespace_list namespaces_;
+    std::optional<llvm::dwarf::AccessAttribute> access_;
 };
 
 class Typedef : public Entry {
@@ -65,7 +71,38 @@ private:
     bool is_static_{true};
     bool is_explicit_{false};
     llvm::dwarf::VirtualityAttribute virtuality_{llvm::dwarf::DW_VIRTUALITY_none};
-    // std::optional<dw::access> access_;
+};
+
+class Enum : public Entry {
+public:
+    struct Enumerator {
+        std::string name;
+        std::int64_t value;
+    };
+    using Entry::Entry;
+    void parse(const llvm::DWARFDie &die) override;
+    [[nodiscard]] std::string to_source() const override;
+
+private:
+    std::string name_;
+    std::optional<std::string> base_type_;
+    std::vector<Enumerator> enumerators_;
+};
+
+class Struct : public Entry {
+public:
+    explicit Struct(bool is_class, namespace_list namespaces = {}) : Entry(std::move(namespaces)), is_class_(is_class)
+    {
+    }
+    void parse(const llvm::DWARFDie &die) override;
+    [[nodiscard]] std::string to_source() const override;
+
+private:
+    std::string name_;
+    bool is_class_;
+    std::map<std::size_t, std::vector<std::unique_ptr<Entry>>> members_;
+    std::optional<std::size_t> byte_size;
+    std::vector<std::pair<llvm::dwarf::AccessAttribute, std::string>> base_classes_;
 };
 
 } // namespace dwarf2cpp
