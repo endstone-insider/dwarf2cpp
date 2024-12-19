@@ -37,16 +37,21 @@ void parse_children(const llvm::DWARFDie &die,
             continue;
         }
 
-        auto decl_line = child.getDeclLine();
-        auto decl_file = child.getDeclFile(llvm::DILineInfoSpecifier::FileLineInfoKind::AbsoluteFilePath);
-        if (name.empty() || decl_file.empty() || decl_line <= 0) {
+        if (name.empty()) {
             continue;
         }
+
+        auto decl_line = child.getDeclLine();
+        auto decl_file = child.getDeclFile(llvm::DILineInfoSpecifier::FileLineInfoKind::AbsoluteFilePath);
 
         std::unique_ptr<dwarf2cpp::Entry> entry;
         switch (tag) {
         case llvm::dwarf::DW_TAG_typedef: {
             entry = std::make_unique<dwarf2cpp::Typedef>(namespaces);
+            break;
+        }
+        case llvm::dwarf::DW_TAG_subprogram: {
+            entry = std::make_unique<dwarf2cpp::Function>(false, namespaces);
             break;
         }
         default:
