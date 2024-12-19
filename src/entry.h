@@ -39,6 +39,7 @@ public:
 private:
     std::string name_;
     std::string type_;
+    bool is_type_alias_{true};
 };
 
 class Parameter : public Entry {

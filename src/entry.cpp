@@ -45,12 +45,40 @@ void Typedef::parse(const llvm::DWARFDie &die)
         llvm::raw_string_ostream os(type_);
         llvm::DWARFTypePrinter type_printer(os);
         type_printer.appendQualifiedName(type);
+        if (!type.getShortName()) {
+            std::unique_ptr<Entry> entry;
+            switch (type.getTag()) {
+            case llvm::dwarf::DW_TAG_class_type:
+                entry = std::make_unique<StructLike>(StructLike::Kind::Class);
+                break;
+            case llvm::dwarf::DW_TAG_enumeration_type:
+                entry = std::make_unique<Enum>();
+                break;
+            case llvm::dwarf::DW_TAG_structure_type:
+                entry = std::make_unique<StructLike>(StructLike::Kind::Struct);
+                break;
+            case llvm::dwarf::DW_TAG_union_type:
+                entry = std::make_unique<StructLike>(StructLike::Kind::Union);
+                break;
+            default:
+                break;
+            }
+            if (entry) {
+                entry->parse(type);
+                type_ = entry->to_source();
+                type_.pop_back(); // remove the trailing semicolon
+                is_type_alias_ = false;
+            }
+        }
     }
 }
 
 std::string Typedef::to_source() const
 {
-    return "using " + name_ + " = " + type_ + ";";
+    if (is_type_alias_) {
+        return "using " + name_ + " = " + type_ + ";";
+    }
+    return "typedef " + type_ + " " + name_ + ";";
 }
 
 void Parameter::parse(const llvm::DWARFDie &die)
