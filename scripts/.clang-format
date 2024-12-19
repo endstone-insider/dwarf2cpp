@@ -1,0 +1,17 @@
+BasedOnStyle: Microsoft
+AccessModifierOffset: -4
+AlignConsecutiveMacros: Consecutive
+AlignEscapedNewlines: Left
+AlignOperands: AlignAfterOperator
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortLambdasOnASingleLine: Inline
+AlwaysBreakTemplateDeclarations: Yes
+BreakBeforeBraces: Stroustrup
+InsertBraces: true
+InsertNewlineAtEOF: true
+MaxEmptyLinesToKeep: 1
+SpacesBeforeTrailingComments: 2
+
+# Additional settings
+ColumnLimit: 120
+EmptyLineBeforeAccessModifier: LogicalBlock
