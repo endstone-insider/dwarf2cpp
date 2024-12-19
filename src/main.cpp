@@ -20,8 +20,7 @@ std::string build_dir;
 std::unordered_map<std::string, dwarf2cpp::SourceFile> files;
 } // namespace
 
-void parse_children(const llvm::DWARFDie &die,
-                    std::vector<std::string> &namespaces) // NOLINT(*-no-recursion)
+void parse_children(const llvm::DWARFDie &die, std::vector<std::string> &namespaces) // NOLINT(*-no-recursion)
 {
     for (const auto &child : die.children()) {
         const auto tag = child.getTag();
@@ -37,7 +36,8 @@ void parse_children(const llvm::DWARFDie &die,
             continue;
         }
 
-        if (name.empty()) {
+        if (!child.find(llvm::dwarf::DW_AT_name) || !child.find(llvm::dwarf::DW_AT_decl_file) ||
+            !child.find(llvm::dwarf::DW_AT_decl_line)) {
             continue;
         }
 
