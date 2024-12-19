@@ -47,7 +47,7 @@ void parse_children(const llvm::DWARFDie &die, std::vector<std::string> &namespa
         std::unique_ptr<dwarf2cpp::Entry> entry;
         switch (tag) {
         case llvm::dwarf::DW_TAG_class_type: {
-            entry = std::make_unique<dwarf2cpp::StructLike>(dwarf2cpp::StructLike::Kind::Class);
+            entry = std::make_unique<dwarf2cpp::StructLike>(dwarf2cpp::StructLike::Kind::Class, namespaces);
             break;
         }
         case llvm::dwarf::DW_TAG_enumeration_type: {
@@ -55,7 +55,7 @@ void parse_children(const llvm::DWARFDie &die, std::vector<std::string> &namespa
             break;
         }
         case llvm::dwarf::DW_TAG_structure_type: {
-            entry = std::make_unique<dwarf2cpp::StructLike>(dwarf2cpp::StructLike::Kind::Struct);
+            entry = std::make_unique<dwarf2cpp::StructLike>(dwarf2cpp::StructLike::Kind::Struct, namespaces);
             break;
         }
         case llvm::dwarf::DW_TAG_typedef: {
@@ -63,7 +63,7 @@ void parse_children(const llvm::DWARFDie &die, std::vector<std::string> &namespa
             break;
         }
         case llvm::dwarf::DW_TAG_union_type: {
-            entry = std::make_unique<dwarf2cpp::StructLike>(dwarf2cpp::StructLike::Kind::Union);
+            entry = std::make_unique<dwarf2cpp::StructLike>(dwarf2cpp::StructLike::Kind::Union, namespaces);
             break;
         }
         case llvm::dwarf::DW_TAG_subprogram: {
@@ -149,9 +149,9 @@ int main(int argc, char **argv)
         std::vector<std::string> namespaces;
         parse_children(cu_die, namespaces);
 
-        if (i >= 10) {
-            break;
-        }
+        // if (i >= 10) {
+        //     break;
+        // }
     }
 
     spdlog::info("Build dir: {}", build_dir);
