@@ -5,6 +5,7 @@
 
 #include <llvm/DebugInfo/DWARF/DWARFTypePrinter.h>
 #include <llvm/Demangle/Demangle.h>
+#include <spdlog/spdlog.h>
 
 #include "algorithm.hpp"
 
@@ -80,8 +81,6 @@ void Function::parse(const llvm::DWARFDie &die)
     if (auto *buffer = die.getLinkageName(); buffer) {
         linkage_name_ = buffer;
     }
-    // TODO: is_const
-    //  For a const member function, the this pointer type will include a const qualifier.
     if (auto type = die.getAttributeValueAsReferencedDie(llvm::dwarf::DW_AT_type); type.isValid()) {
         type = type.resolveTypeUnitReference();
         llvm::raw_string_ostream os(return_type_);
@@ -94,22 +93,39 @@ void Function::parse(const llvm::DWARFDie &die)
     if (die.find(llvm::dwarf::DW_AT_explicit)) {
         is_explicit_ = true;
     }
-    if (die.find(llvm::dwarf::DW_AT_object_pointer)) {
-        is_static_ = false;
-    }
     if (auto attr = die.find(llvm::dwarf::DW_AT_virtuality); attr.has_value()) {
         virtuality_ = static_cast<llvm::dwarf::VirtualityAttribute>(attr->getAsUnsignedConstant().value());
     }
+    bool first_param = true;
     for (const auto &child : die.children()) {
         switch (child.getTag()) {
         case llvm::dwarf::DW_TAG_formal_parameter: {
-            auto &param = parameters_.emplace_back();
-            param.parse(child);
+            // Check if this is a const function by checking the first parameter
+            // For a const member function, the `this` pointer type will include a const qualifier.
+            if (is_member_ && first_param && child.find(llvm::dwarf::DW_AT_artificial)) {
+                // it should be a pointer_type for the `this` pointer
+                if (auto type = child.getAttributeValueAsReferencedDie(llvm::dwarf::DW_AT_type);
+                    type.isValid() && type.getTag() == llvm::dwarf::DW_TAG_pointer_type) {
+                    // it should also include a const qualifier, i.e. it should be const_type
+                    if (type = type.getAttributeValueAsReferencedDie(llvm::dwarf::DW_AT_type);
+                        type.isValid() && type.getTag() == llvm::dwarf::DW_TAG_const_type) {
+                        is_const_ = true;
+                    }
+                    is_static_ = false;
+                }
+            }
+            else {
+                auto &param = parameters_.emplace_back();
+                param.parse(child);
+            }
+            first_param = false;
+            break;
         }
         default:
             // TODO: template params
             break;
         }
+        first_param = false;
     }
 }
 
