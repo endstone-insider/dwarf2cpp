@@ -178,7 +178,7 @@ std::string Enum::to_source() const
     if (!name_.empty()) {
         ss << "class " << name_;
     }
-    if (!base_type_.has_value()) {
+    if (base_type_.has_value()) {
         ss << " : " << base_type_.value();
     }
     ss << " {\n";
