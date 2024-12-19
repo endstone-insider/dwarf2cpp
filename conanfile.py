@@ -13,7 +13,6 @@ class dwarf2cppRecipe(ConanFile):
         "llvm-core/*:targets": "X86",
         "llvm-core/*:with_ffi": False,
         "llvm-core/*:with_libedit": False,
-        "llvm-core/*:with_zlib": False,
         "llvm-core/*:with_xml2": False,
         "llvm-core/*:with_z3": False,
     }
@@ -23,7 +22,7 @@ class dwarf2cppRecipe(ConanFile):
 
     def requirements(self):
         self.requires("argparse/3.1")
-        self.requires("llvm-core/13.0.0")
+        self.requires("llvm-core/19.1.5")
         self.requires("spdlog/1.15.0")
 
     def layout(self):
