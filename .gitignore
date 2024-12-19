@@ -33,3 +33,9 @@
 
 # CMake Presets
 CMakeUserPresets.json
+
+# Build folder
+build/*
+
+# Intellj IDEA
+.idea/*
