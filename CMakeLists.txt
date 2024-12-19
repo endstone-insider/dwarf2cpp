@@ -1,4 +1,9 @@
 cmake_minimum_required(VERSION 3.15)
 project(dwarf2cpp CXX)
 
+find_package(argparse REQUIRED)
+find_package(LLVM REQUIRED)
+find_package(spdlog REQUIRED)
+
 add_executable(dwarf2cpp src/main.cpp)
+target_link_libraries(dwarf2cpp argparse::argparse llvm-core::llvm-core spdlog::spdlog)
