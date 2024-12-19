@@ -89,17 +89,34 @@ private:
     std::vector<Enumerator> enumerators_;
 };
 
-class Struct : public Entry {
+class Field : public Entry {
 public:
-    explicit Struct(bool is_class, namespace_list namespaces = {}) : Entry(std::move(namespaces)), is_class_(is_class)
-    {
-    }
+    using Entry::Entry;
     void parse(const llvm::DWARFDie &die) override;
     [[nodiscard]] std::string to_source() const override;
 
 private:
     std::string name_;
-    bool is_class_;
+    std::string type_;
+    std::optional<std::size_t> member_location_;
+    bool is_static{false};
+    std::optional<std::int64_t> default_value_;
+};
+
+class StructLike : public Entry {
+public:
+    enum class Kind {
+        Struct,
+        Class,
+        Union,
+    };
+    explicit StructLike(Kind kind, namespace_list namespaces = {}) : Entry(std::move(namespaces)), kind_(kind) {}
+    void parse(const llvm::DWARFDie &die) override;
+    [[nodiscard]] std::string to_source() const override;
+
+private:
+    std::string name_;
+    Kind kind_;
     std::map<std::size_t, std::vector<std::unique_ptr<Entry>>> members_;
     std::optional<std::size_t> byte_size;
     std::vector<std::pair<llvm::dwarf::AccessAttribute, std::string>> base_classes_;

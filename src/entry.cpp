@@ -1,5 +1,6 @@
 #include "entry.h"
 
+#include <iomanip>
 #include <sstream>
 
 #include <llvm/DebugInfo/DWARF/DWARFTypePrinter.h>
@@ -78,11 +79,9 @@ void Function::parse(const llvm::DWARFDie &die)
     }
     if (auto *buffer = die.getLinkageName(); buffer) {
         linkage_name_ = buffer;
-        if (const char *demangled = llvm::itaniumDemangle(linkage_name_, true); demangled) {
-            std::string demangled_name = demangled;
-            is_const_ = endswith(demangled_name, "const");
-        }
     }
+    // TODO: is_const
+    //  For a const member function, the this pointer type will include a const qualifier.
     if (auto type = die.getAttributeValueAsReferencedDie(llvm::dwarf::DW_AT_type); type.isValid()) {
         type = type.resolveTypeUnitReference();
         llvm::raw_string_ostream os(return_type_);
@@ -190,7 +189,66 @@ std::string Enum::to_source() const
     return ss.str();
 }
 
-void Struct::parse(const llvm::DWARFDie &die)
+void Field::parse(const llvm::DWARFDie &die)
+{
+    Entry::parse(die);
+    if (auto *buffer = die.getShortName(); buffer) {
+        name_ = buffer;
+    }
+    if (auto type = die.getAttributeValueAsReferencedDie(llvm::dwarf::DW_AT_type); type.isValid()) {
+        type = type.resolveTypeUnitReference();
+        llvm::raw_string_ostream os(type_);
+        llvm::DWARFTypePrinter type_printer(os);
+        type_printer.appendQualifiedName(type);
+    }
+    if (auto attr = die.find(llvm::dwarf::DW_AT_data_member_location); attr.has_value()) {
+        member_location_ = attr->getAsUnsignedConstant().value();
+    }
+    if (auto attr = die.find(llvm::dwarf::DW_AT_external); attr.has_value()) {
+        is_static = true;
+    }
+    if (auto attr = die.find(llvm::dwarf::DW_AT_const_value); attr.has_value()) {
+        if (attr->getForm() == llvm::dwarf::DW_FORM_sdata) {
+            default_value_ = attr->getAsSignedConstant().value();
+        }
+        else {
+            default_value_ = attr->getAsUnsignedConstant().value();
+        }
+    }
+}
+
+std::string Field::to_source() const
+{
+    std::stringstream ss;
+    if (is_static) {
+        ss << "static ";
+    }
+    ss << type_ << " " << name_;
+    if (default_value_.has_value()) {
+        ss << " = ";
+        if (endswith(type_, "float")) {
+            auto value = static_cast<std::int32_t>(default_value_.value());
+            constexpr auto max_precision{std::numeric_limits<float>::digits10 + 1};
+            ss << std::fixed << std::setprecision(max_precision) << *reinterpret_cast<float *>(&value);
+        }
+        else if (endswith(type_, "double")) {
+            auto value = default_value_.value();
+            constexpr auto max_precision{std::numeric_limits<double>::digits10 + 1};
+            ss << std::fixed << std::setprecision(max_precision) << *reinterpret_cast<double *>(&value);
+        }
+        else {
+            ss << default_value_.value();
+        }
+    }
+    ss << ";";
+
+    if (member_location_.has_value()) {
+        ss << " // +" << member_location_.value();
+    }
+    return ss.str();
+}
+
+void StructLike::parse(const llvm::DWARFDie &die)
 {
     Entry::parse(die);
     if (auto *buffer = die.getShortName(); buffer) {
@@ -205,7 +263,7 @@ void Struct::parse(const llvm::DWARFDie &die)
 
         switch (child.getTag()) {
         case llvm::dwarf::DW_TAG_inheritance: {
-            auto access = is_class_ ? llvm::dwarf::DW_ACCESS_private : llvm::dwarf::DW_ACCESS_public;
+            auto access = kind_ == Kind::Class ? llvm::dwarf::DW_ACCESS_private : llvm::dwarf::DW_ACCESS_public;
             if (auto attr = child.find(llvm::dwarf::DW_AT_accessibility)) {
                 access = static_cast<llvm::dwarf::AccessAttribute>(attr->getAsUnsignedConstant().value());
             }
@@ -218,26 +276,26 @@ void Struct::parse(const llvm::DWARFDie &die)
             base_classes_.emplace_back(access, base_type);
             break;
         }
-        // case llvm::dwarf::DW_TAG_member:
-        //     entry = std::make_unique<Field>();
-        //     break;
-        case llvm::dwarf::DW_TAG_subprogram:
-            entry = std::make_unique<Function>(true);
-            break;
-        // case llvm::dwarf::DW_TAG_union_type:
-        //     entry = std::make_unique<Union>();
-        //     break;
-        case llvm::dwarf::DW_TAG_structure_type:
-            entry = std::make_unique<Struct>(false);
-            break;
         case llvm::dwarf::DW_TAG_class_type:
-            entry = std::make_unique<Struct>(true);
+            entry = std::make_unique<StructLike>(Kind::Class);
             break;
         case llvm::dwarf::DW_TAG_enumeration_type:
             entry = std::make_unique<Enum>();
             break;
+        case llvm::dwarf::DW_TAG_member:
+            entry = std::make_unique<Field>();
+            break;
+        case llvm::dwarf::DW_TAG_structure_type:
+            entry = std::make_unique<StructLike>(Kind::Struct);
+            break;
         case llvm::dwarf::DW_TAG_typedef:
             entry = std::make_unique<Typedef>();
+            break;
+        case llvm::dwarf::DW_TAG_union_type:
+            entry = std::make_unique<StructLike>(Kind::Union);
+            break;
+        case llvm::dwarf::DW_TAG_subprogram:
+            entry = std::make_unique<Function>(true);
             break;
         default:
             break;
@@ -250,12 +308,23 @@ void Struct::parse(const llvm::DWARFDie &die)
     }
 }
 
-std::string Struct::to_source() const
+std::string StructLike::to_source() const
 {
-    auto default_access = is_class_ ? llvm::dwarf::DW_ACCESS_private : llvm::dwarf::DW_ACCESS_public;
+    auto default_access = kind_ == Kind::Class ? llvm::dwarf::DW_ACCESS_private : llvm::dwarf::DW_ACCESS_public;
 
     std::stringstream ss;
-    ss << (is_class_ ? "class " : "struct ") << name_;
+    switch (kind_) {
+    case Kind::Struct:
+        ss << "struct ";
+        break;
+    case Kind::Class:
+        ss << "class ";
+        break;
+    case Kind::Union:
+        ss << "union ";
+        break;
+    }
+    ss << name_;
     if (!base_classes_.empty()) {
         ss << ": ";
         for (auto i = 0; i < base_classes_.size(); ++i) {
