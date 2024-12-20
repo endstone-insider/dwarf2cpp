@@ -20,6 +20,7 @@ def process_file(args):
 
     # Replace every occurrence of 'std::__1::' with 'std::'
     content = content.replace("std::__1::", "std::")
+    content = content.replace("std::__ndk1::", "std::")
     content = content.replace(
         "std::basic_string<char, std::char_traits<char>, std::allocator<char> >",
         "std::string",
