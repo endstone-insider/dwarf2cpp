@@ -22,7 +22,8 @@ std::unordered_map<std::string, dwarf2cpp::SourceFile> files;
 
 void parse_children(const llvm::DWARFDie &die, std::vector<std::string> &namespaces) // NOLINT(*-no-recursion)
 {
-    for (const auto &child : die.children()) {
+    for (auto child : die.children()) {
+        child = child.resolveTypeUnitReference();
         const auto tag = child.getTag();
         std::string name;
         if (auto *buffer = child.getShortName(); buffer) {

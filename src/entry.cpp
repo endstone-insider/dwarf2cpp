@@ -340,11 +340,13 @@ void StructLike::parse(const llvm::DWARFDie &die)
     }
 
     std::unordered_set<std::size_t> skipped;
-    for (const auto &child : die.children()) {
+    for (auto child : die.children()) {
+        child = child.resolveTypeUnitReference();
         if (child.getTag() != llvm::dwarf::DW_TAG_member) {
             continue;
         }
         if (auto type = child.getAttributeValueAsReferencedDie(llvm::dwarf::DW_AT_type); type.isValid()) {
+            type = type.resolveTypeUnitReference();
             // skip the anonymous class defined by field
             if (!type.getShortName() && (type.getTag() == llvm::dwarf::DW_TAG_structure_type ||
                                          type.getTag() == llvm::dwarf::DW_TAG_union_type ||
@@ -355,7 +357,8 @@ void StructLike::parse(const llvm::DWARFDie &die)
         }
     }
 
-    for (const auto &child : die.children()) {
+    for (auto child : die.children()) {
+        child = child.resolveTypeUnitReference();
         std::unique_ptr<Entry> entry;
         std::size_t decl_line = child.getDeclLine();
         bool should_skip = skipped.find(child.getOffset()) != skipped.end();
