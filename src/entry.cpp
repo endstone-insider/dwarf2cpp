@@ -2,6 +2,7 @@
 
 #include <iomanip>
 #include <sstream>
+#include <unordered_set>
 
 #include <llvm/Demangle/Demangle.h>
 #include <spdlog/spdlog.h>
@@ -46,6 +47,7 @@ void Typedef::parse(const llvm::DWARFDie &die)
         llvm::DWARFTypePrinter type_printer(os);
         type_printer.appendQualifiedName(type);
         if (!type.getShortName()) {
+            // check if this is anonymous class defined in place
             std::unique_ptr<Entry> entry;
             switch (type.getTag()) {
             case llvm::dwarf::DW_TAG_class_type:
@@ -253,6 +255,32 @@ void Field::parse(const llvm::DWARFDie &die)
             llvm::DWARFTypePrinter type_printer(os);
             type_printer.appendUnqualifiedNameAfter(type, inner);
         }
+        if (!type.getShortName()) {
+            // check if this is anonymous class defined in place
+            std::unique_ptr<Entry> entry;
+            switch (type.getTag()) {
+            case llvm::dwarf::DW_TAG_class_type:
+                entry = std::make_unique<StructLike>(StructLike::Kind::Class);
+                break;
+            case llvm::dwarf::DW_TAG_enumeration_type:
+                entry = std::make_unique<Enum>();
+                break;
+            case llvm::dwarf::DW_TAG_structure_type:
+                entry = std::make_unique<StructLike>(StructLike::Kind::Struct);
+                break;
+            case llvm::dwarf::DW_TAG_union_type:
+                entry = std::make_unique<StructLike>(StructLike::Kind::Union);
+                break;
+            default:
+                break;
+            }
+            if (entry) {
+                entry->parse(type);
+                type_before_ = entry->to_source();
+                type_before_.pop_back(); // remove the trailing semicolon
+                type_after_.clear();
+            }
+        }
     }
     if (auto attr = die.find(llvm::dwarf::DW_AT_data_member_location); attr.has_value()) {
         member_location_ = attr->getAsUnsignedConstant().value();
@@ -310,9 +338,27 @@ void StructLike::parse(const llvm::DWARFDie &die)
     if (auto attr = die.find(llvm::dwarf::DW_AT_byte_size); attr) {
         byte_size = attr->getAsUnsignedConstant().value();
     }
+
+    std::unordered_set<std::size_t> skipped;
+    for (const auto &child : die.children()) {
+        if (child.getTag() != llvm::dwarf::DW_TAG_member) {
+            continue;
+        }
+        if (auto type = child.getAttributeValueAsReferencedDie(llvm::dwarf::DW_AT_type); type.isValid()) {
+            // skip the anonymous class defined by field
+            if (!type.getShortName() && (type.getTag() == llvm::dwarf::DW_TAG_structure_type ||
+                                         type.getTag() == llvm::dwarf::DW_TAG_union_type ||
+                                         type.getTag() == llvm::dwarf::DW_TAG_enumeration_type ||
+                                         type.getTag() == llvm::dwarf::DW_TAG_class_type)) {
+                skipped.emplace(type.getOffset());
+            }
+        }
+    }
+
     for (const auto &child : die.children()) {
         std::unique_ptr<Entry> entry;
         std::size_t decl_line = child.getDeclLine();
+        bool should_skip = skipped.find(child.getOffset()) != skipped.end();
 
         switch (child.getTag()) {
         case llvm::dwarf::DW_TAG_inheritance: {
@@ -330,22 +376,22 @@ void StructLike::parse(const llvm::DWARFDie &die)
             break;
         }
         case llvm::dwarf::DW_TAG_class_type:
-            entry = std::make_unique<StructLike>(Kind::Class);
+            entry = should_skip ? nullptr : std::make_unique<StructLike>(Kind::Class);
             break;
         case llvm::dwarf::DW_TAG_enumeration_type:
-            entry = std::make_unique<Enum>();
+            entry = should_skip ? nullptr : std::make_unique<Enum>();
             break;
         case llvm::dwarf::DW_TAG_member:
             entry = std::make_unique<Field>();
             break;
         case llvm::dwarf::DW_TAG_structure_type:
-            entry = std::make_unique<StructLike>(Kind::Struct);
+            entry = should_skip ? nullptr : std::make_unique<StructLike>(Kind::Struct);
             break;
         case llvm::dwarf::DW_TAG_typedef:
             entry = std::make_unique<Typedef>();
             break;
         case llvm::dwarf::DW_TAG_union_type:
-            entry = std::make_unique<StructLike>(Kind::Union);
+            entry = should_skip ? nullptr : std::make_unique<StructLike>(Kind::Union);
             break;
         case llvm::dwarf::DW_TAG_subprogram:
             entry = std::make_unique<Function>(true);
