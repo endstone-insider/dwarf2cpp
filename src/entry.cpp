@@ -49,8 +49,8 @@ std::string parse_template_params(const llvm::DWARFDie &die)
             break;
         }
         case llvm::dwarf::DW_TAG_template_value_parameter: {
-            auto type = child.getAttributeValueAsReferencedDie(llvm::dwarf::DW_AT_type);
             sep();
+            auto type = child.getAttributeValueAsReferencedDie(llvm::dwarf::DW_AT_type);
             llvm::DWARFTypePrinter type_printer(os);
             type_printer.appendQualifiedName(type);
             os << " " << child.getShortName();
@@ -340,6 +340,9 @@ void Field::parse(const llvm::DWARFDie &die)
     if (auto attr = die.find(llvm::dwarf::DW_AT_data_member_location); attr.has_value()) {
         member_location_ = attr->getAsUnsignedConstant().value();
     }
+    if (auto attr = die.find(llvm::dwarf::DW_AT_bit_size); attr.has_value()) {
+        bit_size_ = attr->getAsUnsignedConstant().value();
+    }
     if (auto attr = die.find(llvm::dwarf::DW_AT_external); attr.has_value()) {
         is_static = true;
     }
@@ -360,6 +363,9 @@ std::string Field::to_source() const
         ss << "static ";
     }
     ss << type_before_ << " " << name_ << type_after_;
+    if (bit_size_.has_value()) {
+        ss << " : " << bit_size_.value();
+    }
     if (default_value_.has_value()) {
         ss << " = ";
         if (endswith(type_before_, "float")) {
