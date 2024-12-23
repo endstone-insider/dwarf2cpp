@@ -24,6 +24,58 @@ std::string to_string(llvm::dwarf::AccessAttribute a)
         throw std::runtime_error("unknown access");
     }
 }
+
+std::string parse_template_params(const llvm::DWARFDie &die)
+{
+    std::string result;
+    llvm::raw_string_ostream os(result);
+    bool first = true;
+
+    auto sep = [&] {
+        if (first) {
+            os << "template <";
+        }
+        else {
+            os << ", ";
+        }
+        first = false;
+    };
+
+    for (const auto &child : die.children()) {
+        switch (child.getTag()) {
+        case llvm::dwarf::DW_TAG_template_type_parameter: {
+            sep();
+            os << "typename " << child.getShortName();
+            break;
+        }
+        case llvm::dwarf::DW_TAG_template_value_parameter: {
+            auto type = child.getAttributeValueAsReferencedDie(llvm::dwarf::DW_AT_type);
+            sep();
+            llvm::DWARFTypePrinter type_printer(os);
+            type_printer.appendQualifiedName(type);
+            os << " " << child.getShortName();
+            break;
+        }
+        case llvm::dwarf::DW_TAG_GNU_template_parameter_pack: {
+            sep();
+            os << "typename... " << child.getShortName();
+            break;
+        }
+        case llvm::dwarf::DW_TAG_GNU_template_template_param: {
+            sep();
+            os << "template<typename> class " << child.getShortName();
+            break;
+        }
+        default:
+            break;
+        }
+    }
+
+    if (!result.empty()) {
+        os << ">";
+    }
+    return result;
+}
 } // namespace
 
 namespace dwarf2cpp {
@@ -152,15 +204,18 @@ void Function::parse(const llvm::DWARFDie &die)
             break;
         }
         default:
-            // TODO: template params
             break;
         }
     }
+    template_params_ = parse_template_params(die);
 }
 
 std::string Function::to_source() const
 {
     std::stringstream ss;
+    if (!template_params_.empty()) {
+        ss << "// " << template_params_ << "\n";
+    }
     if (is_member_ && is_static_) {
         ss << "static ";
     }
@@ -317,6 +372,12 @@ std::string Field::to_source() const
             constexpr auto max_precision{std::numeric_limits<double>::digits10 + 1};
             ss << std::fixed << std::setprecision(max_precision) << *reinterpret_cast<double *>(&value);
         }
+        else if (endswith(type_before_, "char")) {
+            ss << "'" << static_cast<char>(default_value_.value()) << "'";
+        }
+        else if (endswith(type_before_, "bool")) {
+            ss << (default_value_.value() ? "true" : "false");
+        }
         else {
             ss << default_value_.value();
         }
@@ -408,6 +469,8 @@ void StructLike::parse(const llvm::DWARFDie &die)
             members_[decl_line].emplace_back(std::move(entry));
         }
     }
+
+    template_params_ = parse_template_params(die);
 }
 
 std::string StructLike::to_source() const
@@ -415,6 +478,9 @@ std::string StructLike::to_source() const
     auto default_access = kind_ == Kind::Class ? llvm::dwarf::DW_ACCESS_private : llvm::dwarf::DW_ACCESS_public;
 
     std::stringstream ss;
+    if (!template_params_.empty()) {
+        ss << "// " << template_params_ << "\n";
+    }
     switch (kind_) {
     case Kind::Struct:
         ss << "struct ";

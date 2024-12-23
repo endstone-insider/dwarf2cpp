@@ -67,6 +67,7 @@ private:
     std::string linkage_name_;
     std::string return_type_;
     std::vector<Parameter> parameters_;
+    std::string template_params_;
     bool is_const_{false};
     bool is_member_{false};
     bool is_static_{true};
@@ -122,6 +123,7 @@ private:
     std::map<std::size_t, std::vector<std::unique_ptr<Entry>>> members_;
     std::optional<std::size_t> byte_size;
     std::vector<std::pair<llvm::dwarf::AccessAttribute, std::string>> base_classes_;
+    std::string template_params_;
 };
 
 } // namespace dwarf2cpp
