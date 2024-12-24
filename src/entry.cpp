@@ -175,6 +175,17 @@ void Function::parse(const llvm::DWARFDie &die)
     if (die.find(llvm::dwarf::DW_AT_explicit)) {
         is_explicit_ = true;
     }
+    // If the member function entry has been declared as deleted, then that entry has a
+    // DW_AT_deleted attribute
+    if (die.find(llvm::dwarf::DW_AT_defaulted)) {
+        is_defaulted_ = true;
+    }
+    // If the member function has been declared as defaulted, then the entry has a
+    // DW_AT_defaulted attribute whose integer constant value indicates whether, and
+    // if so, how, that member is defaulted.
+    if (die.find(llvm::dwarf::DW_AT_deleted)) {
+        is_deleted_ = true;
+    }
     if (auto attr = die.find(llvm::dwarf::DW_AT_virtuality); attr.has_value()) {
         virtuality_ = static_cast<llvm::dwarf::VirtualityAttribute>(attr->getAsUnsignedConstant().value());
     }
@@ -241,6 +252,12 @@ std::string Function::to_source() const
     }
     if (virtuality_ == llvm::dwarf::DW_VIRTUALITY_pure_virtual) {
         ss << " = 0";
+    }
+    if (is_defaulted_) {
+        ss << " = default";
+    }
+    if (is_deleted_) {
+        ss << " = delete";
     }
     ss << ";";
     return ss.str();
@@ -344,7 +361,10 @@ void Field::parse(const llvm::DWARFDie &die)
         bit_size_ = attr->getAsUnsignedConstant().value();
     }
     if (auto attr = die.find(llvm::dwarf::DW_AT_external); attr.has_value()) {
-        is_static = true;
+        is_static_ = true;
+    }
+    if (auto attr = die.find(llvm::dwarf::DW_AT_mutable); attr.has_value()) {
+        is_mutable_ = true;
     }
     if (auto attr = die.find(llvm::dwarf::DW_AT_const_value); attr.has_value()) {
         if (attr->getForm() == llvm::dwarf::DW_FORM_sdata) {
@@ -359,8 +379,11 @@ void Field::parse(const llvm::DWARFDie &die)
 std::string Field::to_source() const
 {
     std::stringstream ss;
-    if (is_static) {
+    if (is_static_) {
         ss << "static ";
+    }
+    if (is_mutable_) {
+        ss << "mutable ";
     }
     ss << type_before_ << " " << name_ << type_after_;
     if (bit_size_.has_value()) {
@@ -432,14 +455,32 @@ void StructLike::parse(const llvm::DWARFDie &die)
 
         switch (child.getTag()) {
         case llvm::dwarf::DW_TAG_inheritance: {
+            // An inheritance entry may have a DW_AT_accessibility attribute. If no
+            // accessibility attribute is present, private access is assumed for an entry of a class
+            // and public access is assumed for an entry of a struct, union or interface
             auto access = kind_ == Kind::Class ? llvm::dwarf::DW_ACCESS_private : llvm::dwarf::DW_ACCESS_public;
             if (auto attr = child.find(llvm::dwarf::DW_AT_accessibility)) {
                 access = static_cast<llvm::dwarf::AccessAttribute>(attr->getAsUnsignedConstant().value());
             }
+
+            // If the class referenced by the inheritance entry serves as a C++ virtual base class,
+            // the inheritance entry has a DW_AT_virtuality attribute.
+            auto virtuality = llvm::dwarf::VirtualityAttribute::DW_VIRTUALITY_none;
+            if (auto attr = child.find(llvm::dwarf::DW_AT_virtuality)) {
+                virtuality = static_cast<llvm::dwarf::VirtualityAttribute>(attr->getAsUnsignedConstant().value());
+            }
+
+            // An inheritance entry has a DW_AT_type attribute whose value is a reference to
+            // the debugging information entry describing the class or interface from which the
+            // parent class or structure of the inheritance entry is derived, extended or
+            // implementing
             auto type = child.getAttributeValueAsReferencedDie(llvm::dwarf::DW_AT_type);
             type = type.resolveTypeUnitReference();
             std::string base_type;
             llvm::raw_string_ostream os(base_type);
+            if (virtuality > llvm::dwarf::VirtualityAttribute::DW_VIRTUALITY_none) {
+                os << "virtual ";
+            }
             llvm::DWARFTypePrinter type_printer(os);
             type_printer.appendQualifiedName(type);
             base_classes_.emplace_back(access, base_type);
@@ -465,6 +506,19 @@ void StructLike::parse(const llvm::DWARFDie &die)
             break;
         case llvm::dwarf::DW_TAG_subprogram:
             entry = std::make_unique<Function>(true);
+            break;
+        case llvm::dwarf::DW_TAG_access_declaration:
+            // TODO: support access declarations
+            // An access declaration entry has a DW_AT_name attribute, whose value is a
+            // null-terminated string representing the name used in the declaration, including
+            // any class or structure qualifiers.
+            // An access declaration entry also has a DW_AT_accessibility attribute describing
+            // the declared accessibility of the named entities.
+            break;
+        case llvm::dwarf::DW_TAG_friend:
+            // TODO: support friends
+            // A friend entry has a DW_AT_friend attribute, whose value is a reference to the
+            // debugging information entry describing the declaration of the friend
             break;
         default:
             break;

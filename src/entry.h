@@ -72,6 +72,8 @@ private:
     bool is_member_{false};
     bool is_static_{true};
     bool is_explicit_{false};
+    bool is_defaulted_{false};
+    bool is_deleted_{false};
     llvm::dwarf::VirtualityAttribute virtuality_{llvm::dwarf::DW_VIRTUALITY_none};
 };
 
@@ -103,7 +105,8 @@ private:
     std::string type_after_;
     std::optional<std::size_t> member_location_;
     std::optional<std::size_t> bit_size_;
-    bool is_static{false};
+    bool is_static_{false};
+    bool is_mutable_{false};
     std::optional<std::int64_t> default_value_;
 };
 
