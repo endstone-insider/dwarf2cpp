@@ -91,6 +91,7 @@ private:
     std::string name_;
     std::optional<std::string> base_type_;
     std::vector<Enumerator> enumerators_;
+    bool is_enum_class_{false};
 };
 
 class Field : public Entry {

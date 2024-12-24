@@ -286,15 +286,19 @@ void Enum::parse(const llvm::DWARFDie &die)
         enumerator.value = child.find(llvm::dwarf::DW_AT_const_value)->getAsSignedConstant().value();
         enumerators_.push_back(enumerator);
     }
+    if (die.find(llvm::dwarf::DW_AT_enum_class)) {
+        is_enum_class_ = true;
+    }
 }
 
 std::string Enum::to_source() const
 {
     std::stringstream ss;
     ss << "enum ";
-    if (!name_.empty()) {
-        ss << "class " << name_;
+    if (is_enum_class_) {
+        ss << "class ";
     }
+    ss << name_;
     if (base_type_.has_value()) {
         ss << " : " << base_type_.value();
     }
