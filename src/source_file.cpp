@@ -4,9 +4,17 @@
 
 namespace dwarf2cpp {
 
-void SourceFile::add(std::size_t line, std::unique_ptr<Entry> new_entry)
+void SourceFile::add(std::size_t line, std::unique_ptr<Entry> entry)
 {
-    lines_[line] = std::move(new_entry);
+    lines_[line] = std::move(entry);
+}
+
+Entry *SourceFile::get(std::size_t line)
+{
+    if (auto it = lines_.find(line); it != lines_.end()) {
+        return it->second.get();
+    }
+    return nullptr;
 }
 
 std::string SourceFile::to_source() const

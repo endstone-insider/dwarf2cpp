@@ -10,7 +10,8 @@ namespace dwarf2cpp {
 
 class SourceFile {
 public:
-    void add(std::size_t line, std::unique_ptr<Entry> new_entry);
+    void add(std::size_t line, std::unique_ptr<Entry> entry);
+    Entry *get(std::size_t line);
     [[nodiscard]] std::string to_source() const;
     friend std::ostream &operator<<(std::ostream &os, const SourceFile &sf);
 
