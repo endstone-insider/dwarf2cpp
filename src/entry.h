@@ -37,7 +37,7 @@ public:
     [[nodiscard]] std::string to_source() const override;
 
 private:
-    std::string name_;
+    std::vector<std::string> names_;
     std::string type_;
     bool is_type_alias_{true};
 };
@@ -63,6 +63,8 @@ public:
     [[nodiscard]] std::string to_source() const override;
 
 private:
+    void parse_children(const llvm::DWARFDie &die);
+
     std::string name_;
     std::string linkage_name_;
     std::string return_type_;
@@ -88,6 +90,8 @@ public:
     [[nodiscard]] std::string to_source() const override;
 
 private:
+    void parse_children(const llvm::DWARFDie &die);
+
     std::string name_;
     std::optional<std::string> base_type_;
     std::vector<Enumerator> enumerators_;

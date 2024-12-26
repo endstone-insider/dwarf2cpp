@@ -54,6 +54,13 @@ void parse_children(const llvm::DWARFDie &die, std::vector<std::string> &namespa
             continue;
         }
 
+        if (tag == llvm::dwarf::DW_TAG_typedef) {
+            auto entry = std::make_unique<dwarf2cpp::Typedef>(namespaces);
+            entry->parse(child_type);
+            files[decl_file].add(decl_line, std::move(entry));
+            continue;
+        }
+
         dwarf2cpp::Entry *existing_entry = nullptr;
         if (auto it = files.find(decl_file); it != files.end()) {
             existing_entry = files[decl_file].get(decl_line);
@@ -72,10 +79,6 @@ void parse_children(const llvm::DWARFDie &die, std::vector<std::string> &namespa
             }
             case llvm::dwarf::DW_TAG_structure_type: {
                 entry = std::make_unique<dwarf2cpp::StructLike>(dwarf2cpp::StructLike::Kind::Struct, namespaces);
-                break;
-            }
-            case llvm::dwarf::DW_TAG_typedef: {
-                entry = std::make_unique<dwarf2cpp::Typedef>(namespaces);
                 break;
             }
             case llvm::dwarf::DW_TAG_union_type: {

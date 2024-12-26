@@ -4,6 +4,7 @@
 #include <sstream>
 #include <unordered_set>
 
+#include <llvm/ADT/StringExtras.h>
 #include <llvm/Demangle/Demangle.h>
 #include <spdlog/spdlog.h>
 
@@ -91,37 +92,41 @@ void Typedef::parse(const llvm::DWARFDie &die)
 {
     Entry::parse(die);
     if (auto *buffer = die.getShortName(); buffer) {
-        name_ = buffer;
+        names_.emplace_back(buffer);
+        auto last = std::unique(names_.begin(), names_.end());
+        names_.erase(last, names_.end());
     }
-    if (auto type = die.getAttributeValueAsReferencedDie(llvm::dwarf::DW_AT_type); type.isValid()) {
-        type = type.resolveTypeUnitReference();
-        llvm::raw_string_ostream os(type_);
-        llvm::DWARFTypePrinter type_printer(os);
-        type_printer.appendQualifiedName(type);
-        if (!type.getShortName()) {
-            // check if this is anonymous class defined in place
-            std::unique_ptr<Entry> entry;
-            switch (type.getTag()) {
-            case llvm::dwarf::DW_TAG_class_type:
-                entry = std::make_unique<StructLike>(StructLike::Kind::Class);
-                break;
-            case llvm::dwarf::DW_TAG_enumeration_type:
-                entry = std::make_unique<Enum>();
-                break;
-            case llvm::dwarf::DW_TAG_structure_type:
-                entry = std::make_unique<StructLike>(StructLike::Kind::Struct);
-                break;
-            case llvm::dwarf::DW_TAG_union_type:
-                entry = std::make_unique<StructLike>(StructLike::Kind::Union);
-                break;
-            default:
-                break;
-            }
-            if (entry) {
-                entry->parse(type);
-                type_ = entry->to_source();
-                type_.pop_back(); // remove the trailing semicolon
-                is_type_alias_ = false;
+    if (type_.empty()) {
+        if (auto type = die.getAttributeValueAsReferencedDie(llvm::dwarf::DW_AT_type); type.isValid()) {
+            type = type.resolveTypeUnitReference();
+            llvm::raw_string_ostream os(type_);
+            llvm::DWARFTypePrinter type_printer(os);
+            type_printer.appendQualifiedName(type);
+            if (!type.getShortName()) {
+                // check if this is anonymous class defined in place
+                std::unique_ptr<Entry> entry;
+                switch (type.getTag()) {
+                case llvm::dwarf::DW_TAG_class_type:
+                    entry = std::make_unique<StructLike>(StructLike::Kind::Class);
+                    break;
+                case llvm::dwarf::DW_TAG_enumeration_type:
+                    entry = std::make_unique<Enum>();
+                    break;
+                case llvm::dwarf::DW_TAG_structure_type:
+                    entry = std::make_unique<StructLike>(StructLike::Kind::Struct);
+                    break;
+                case llvm::dwarf::DW_TAG_union_type:
+                    entry = std::make_unique<StructLike>(StructLike::Kind::Union);
+                    break;
+                default:
+                    break;
+                }
+                if (entry) {
+                    entry->parse(type);
+                    type_ = entry->to_source();
+                    type_.pop_back(); // remove the trailing semicolon
+                    is_type_alias_ = false;
+                }
             }
         }
     }
@@ -130,9 +135,10 @@ void Typedef::parse(const llvm::DWARFDie &die)
 std::string Typedef::to_source() const
 {
     if (is_type_alias_) {
-        return "using " + name_ + " = " + type_ + ";";
+        return "using " + names_[0] + " = " + type_ + ";";
     }
-    return "typedef " + type_ + " " + name_ + ";";
+
+    return "typedef " + type_ + " " + llvm::join(names_.begin(), names_.end(), ",") + ";";
 }
 
 void Parameter::parse(const llvm::DWARFDie &die)
@@ -189,6 +195,16 @@ void Function::parse(const llvm::DWARFDie &die)
     if (auto attr = die.find(llvm::dwarf::DW_AT_virtuality); attr.has_value()) {
         virtuality_ = static_cast<llvm::dwarf::VirtualityAttribute>(attr->getAsUnsignedConstant().value());
     }
+    if (parameters_.empty()) {
+        parse_children(die);
+    }
+    if (auto template_params = parse_template_params(die); !template_params.empty()) {
+        template_params_ = template_params;
+    }
+}
+
+void Function::parse_children(const llvm::DWARFDie &die)
+{
     bool first_param = true;
     for (const auto &child : die.children()) {
         switch (child.getTag()) {
@@ -218,7 +234,6 @@ void Function::parse(const llvm::DWARFDie &die)
             break;
         }
     }
-    template_params_ = parse_template_params(die);
 }
 
 std::string Function::to_source() const
@@ -277,6 +292,16 @@ void Enum::parse(const llvm::DWARFDie &die)
         type_printer.appendQualifiedName(type);
         base_type_ = base_type;
     }
+    if (enumerators_.empty()) {
+        parse_children(die);
+    }
+    if (die.find(llvm::dwarf::DW_AT_enum_class)) {
+        is_enum_class_ = true;
+    }
+}
+
+void Enum::parse_children(const llvm::DWARFDie &die)
+{
     for (const auto &child : die.children()) {
         if (child.getTag() != llvm::dwarf::DW_TAG_enumerator) {
             continue;
@@ -285,9 +310,6 @@ void Enum::parse(const llvm::DWARFDie &die)
         enumerator.name = child.getShortName();
         enumerator.value = child.find(llvm::dwarf::DW_AT_const_value)->getAsSignedConstant().value();
         enumerators_.push_back(enumerator);
-    }
-    if (die.find(llvm::dwarf::DW_AT_enum_class)) {
-        is_enum_class_ = true;
     }
 }
 
@@ -451,6 +473,8 @@ void StructLike::parse(const llvm::DWARFDie &die)
         }
     }
 
+    decltype(base_classes_) base_classes;
+    decltype(members_) members;
     for (auto child : die.children()) {
         child = child.resolveTypeUnitReference();
         std::unique_ptr<Entry> entry;
@@ -487,7 +511,7 @@ void StructLike::parse(const llvm::DWARFDie &die)
             }
             llvm::DWARFTypePrinter type_printer(os);
             type_printer.appendQualifiedName(type);
-            base_classes_.emplace_back(access, base_type);
+            base_classes.emplace_back(access, base_type);
             break;
         }
         case llvm::dwarf::DW_TAG_class_type:
@@ -511,30 +535,44 @@ void StructLike::parse(const llvm::DWARFDie &die)
         case llvm::dwarf::DW_TAG_subprogram:
             entry = std::make_unique<Function>(true);
             break;
-        case llvm::dwarf::DW_TAG_access_declaration:
-            // TODO: support access declarations
-            // An access declaration entry has a DW_AT_name attribute, whose value is a
-            // null-terminated string representing the name used in the declaration, including
-            // any class or structure qualifiers.
-            // An access declaration entry also has a DW_AT_accessibility attribute describing
-            // the declared accessibility of the named entities.
-            break;
-        case llvm::dwarf::DW_TAG_friend:
-            // TODO: support friends
-            // A friend entry has a DW_AT_friend attribute, whose value is a reference to the
-            // debugging information entry describing the declaration of the friend
-            break;
         default:
             break;
         }
 
         if (entry && decl_line > 0) {
             entry->parse(child);
-            members_[decl_line].emplace_back(std::move(entry));
+            members[decl_line].emplace_back(std::move(entry));
         }
     }
 
-    template_params_ = parse_template_params(die);
+    for (auto &[decl_line, member] : members) {
+        // Remove consecutive (adjacent) duplicates
+        auto last = std::unique(member.begin(), member.end(),
+                                [](const auto &lhs, const auto &rhs) { return lhs->to_source() == rhs->to_source(); });
+        member.erase(last, member.end());
+
+        if (auto it = members_.find(decl_line); it != members_.end()) {
+            if (member.size() >= it->second.size()) {
+                it->second.clear();
+                for (auto &m : member) {
+                    it->second.emplace_back(std::move(m));
+                }
+            }
+        }
+        else {
+            for (auto &m : member) {
+                members_[decl_line].emplace_back(std::move(m));
+            }
+        }
+    }
+
+    if (!base_classes.empty()) {
+        base_classes_ = base_classes;
+    }
+
+    if (auto template_params = parse_template_params(die); !template_params.empty()) {
+        template_params_ = template_params;
+    }
 }
 
 std::string StructLike::to_source() const
