@@ -11,11 +11,22 @@ namespace dwarf2cpp {
 
 class Entry {
 public:
+    enum class Type {
+        Typedef,
+        Parameter,
+        Function,
+        Enum,
+        Field,
+        StructLike
+    };
+
     using namespace_list = std::vector<std::string>;
     explicit Entry(namespace_list namespaces = {}) : namespaces_(std::move(namespaces)){};
     virtual ~Entry() = default;
     virtual void parse(const llvm::DWARFDie &die);
     [[nodiscard]] virtual std::string to_source() const = 0;
+    [[nodiscard]] virtual Type type() const = 0;
+
     [[nodiscard]] namespace_list namespaces() const
     {
         return namespaces_;
@@ -35,6 +46,10 @@ public:
     using Entry::Entry;
     void parse(const llvm::DWARFDie &die) override;
     [[nodiscard]] std::string to_source() const override;
+    [[nodiscard]] Type type() const override
+    {
+        return Type::Typedef;
+    }
 
 private:
     std::vector<std::string> names_;
@@ -47,6 +62,10 @@ public:
     using Entry::Entry;
     void parse(const llvm::DWARFDie &die) override;
     [[nodiscard]] std::string to_source() const override;
+    [[nodiscard]] Type type() const override
+    {
+        return Type::Parameter;
+    }
 
 private:
     std::string name_;
@@ -61,6 +80,10 @@ public:
     }
     void parse(const llvm::DWARFDie &die) override;
     [[nodiscard]] std::string to_source() const override;
+    [[nodiscard]] Type type() const override
+    {
+        return Type::Function;
+    }
 
 private:
     void parse_children(const llvm::DWARFDie &die);
@@ -88,6 +111,10 @@ public:
     using Entry::Entry;
     void parse(const llvm::DWARFDie &die) override;
     [[nodiscard]] std::string to_source() const override;
+    [[nodiscard]] Type type() const override
+    {
+        return Type::Enum;
+    }
 
 private:
     void parse_children(const llvm::DWARFDie &die);
@@ -103,6 +130,10 @@ public:
     using Entry::Entry;
     void parse(const llvm::DWARFDie &die) override;
     [[nodiscard]] std::string to_source() const override;
+    [[nodiscard]] Type type() const override
+    {
+        return Type::Field;
+    }
 
 private:
     std::string type_before_;
@@ -125,6 +156,10 @@ public:
     explicit StructLike(Kind kind, namespace_list namespaces = {}) : Entry(std::move(namespaces)), kind_(kind) {}
     void parse(const llvm::DWARFDie &die) override;
     [[nodiscard]] std::string to_source() const override;
+    [[nodiscard]] Type type() const override
+    {
+        return Type::StructLike;
+    }
 
 private:
     std::string name_;
