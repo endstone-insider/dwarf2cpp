@@ -11,6 +11,7 @@
 #include <spdlog/spdlog.h>
 
 #include "algorithm.hpp"
+#include "posixpath.hpp"
 #include "type_printer.h"
 
 namespace {
@@ -470,6 +471,10 @@ void StructLike::parse(const llvm::DWARFDie &die)
         byte_size = attr->getAsUnsignedConstant().value();
     }
 
+    std::string decl_file = die.getDeclFile(llvm::DILineInfoSpecifier::FileLineInfoKind::AbsoluteFilePath);
+    std::replace(decl_file.begin(), decl_file.end(), '\\', '/');
+    decl_file = posixpath::normpath(decl_file);
+
     std::unordered_set<std::size_t> skipped;
     for (auto child : die.children()) {
         child = child.resolveTypeUnitReference();
@@ -492,10 +497,25 @@ void StructLike::parse(const llvm::DWARFDie &die)
     decltype(members_) members;
     for (auto child : die.children()) {
         child = child.resolveTypeUnitReference();
-        std::unique_ptr<Entry> entry;
-        std::size_t decl_line = child.getDeclLine();
-        bool should_skip = skipped.find(child.getOffset()) != skipped.end();
 
+        // Check if the parent has a declaration file (decl_file) set
+        // - If the parent has decl_file set, but the child doesn't, we assume the child has the same declaration
+        //   context as the parent.
+        // - If the parent has decl_file set, but the child has a different one, this might indicate a template
+        //   specialization (skip processing for now).
+        if (!decl_file.empty()) {
+            std::string child_decl_file =
+                child.getDeclFile(llvm::DILineInfoSpecifier::FileLineInfoKind::AbsoluteFilePath);
+            std::replace(child_decl_file.begin(), child_decl_file.end(), '\\', '/');
+            child_decl_file = posixpath::normpath(child_decl_file);
+            if (!child_decl_file.empty() && child_decl_file != decl_file) {
+                // TODO: handle template specialization
+                continue;
+            }
+        }
+
+        bool should_skip = skipped.find(child.getOffset()) != skipped.end();
+        std::unique_ptr<Entry> entry;
         switch (child.getTag()) {
         case llvm::dwarf::DW_TAG_inheritance: {
             // An inheritance entry may have a DW_AT_accessibility attribute. If no
@@ -554,6 +574,7 @@ void StructLike::parse(const llvm::DWARFDie &die)
             break;
         }
 
+        std::size_t decl_line = child.getDeclLine();
         if (entry && decl_line > 0) {
             entry->parse(child);
             members[decl_line].emplace_back(std::move(entry));
