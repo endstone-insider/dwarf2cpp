@@ -1,7 +1,9 @@
 #include "entry.h"
 
 #include <iomanip>
+#include <regex>
 #include <sstream>
+#include <string>
 #include <unordered_set>
 
 #include <llvm/ADT/StringExtras.h>
@@ -77,6 +79,13 @@ std::string parse_template_params(const llvm::DWARFDie &die)
     }
     return result;
 }
+
+void remove_lambda(std::string &target)
+{
+    static std::regex pattern(R"(\(lambda at .+?\))");
+    target = std::regex_replace(target, pattern, "Lambda");
+}
+
 } // namespace
 
 namespace dwarf2cpp {
@@ -92,8 +101,10 @@ void Typedef::parse(const llvm::DWARFDie &die)
 {
     Entry::parse(die);
     if (auto *buffer = die.getShortName(); buffer) {
-        names_.emplace_back(buffer);
-        auto last = std::unique(names_.begin(), names_.end());
+        std::string name = buffer;
+        remove_lambda(name);
+        names_.emplace_back(name);
+        const auto last = std::unique(names_.begin(), names_.end());
         names_.erase(last, names_.end());
     }
     if (type_.empty()) {
@@ -102,6 +113,7 @@ void Typedef::parse(const llvm::DWARFDie &die)
             llvm::raw_string_ostream os(type_);
             llvm::DWARFTypePrinter type_printer(os);
             type_printer.appendQualifiedName(type);
+            remove_lambda(type_);
             if (!type.getShortName()) {
                 // check if this is anonymous class defined in place
                 std::unique_ptr<Entry> entry;
@@ -152,6 +164,7 @@ void Parameter::parse(const llvm::DWARFDie &die)
         llvm::raw_string_ostream os(type_);
         llvm::DWARFTypePrinter type_printer(os);
         type_printer.appendQualifiedName(type);
+        remove_lambda(type_);
     }
 }
 
@@ -165,6 +178,7 @@ void Function::parse(const llvm::DWARFDie &die)
     Entry::parse(die);
     if (auto *buffer = die.getShortName(); buffer) {
         name_ = buffer;
+        remove_lambda(name_);
     }
     if (auto *buffer = die.getLinkageName(); buffer) {
         linkage_name_ = buffer;
@@ -450,6 +464,7 @@ void StructLike::parse(const llvm::DWARFDie &die)
     Entry::parse(die);
     if (auto *buffer = die.getShortName(); buffer) {
         name_ = buffer;
+        remove_lambda(name_);
     }
     if (auto attr = die.find(llvm::dwarf::DW_AT_byte_size); attr) {
         byte_size = attr->getAsUnsignedConstant().value();

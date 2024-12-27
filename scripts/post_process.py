@@ -33,7 +33,7 @@ def process_file(args):
         "std::chrono::time_point<std::chrono::steady_clock, std::chrono::duration<long long, std::ratio<1L, 1000000000L> > >",
         "std::chrono::steady_clock::time_point",
     )
-    content = re.sub(r"\(lambda at .+?\)", "Lambda", content)
+    # content = re.sub(r"\(lambda at .+?\)", "Lambda", content)
 
     pattern_repl = [
         # std::unique_ptr
@@ -80,9 +80,6 @@ def process_file(args):
         (r"glm::vec<(\d),\s*float,\s*\(glm::qualifier\)0>", r"glm::vec\1"),
         # glm::mat
         (r"glm::mat<(\d),\s*(\d),\s*float,\s*\(glm::qualifier\)0>", r"glm::mat\1x\2"),
-        # duplicated anonymous types
-        # (r"((?:union|enum|struct|class)\s*{[\s\S]+?});\s*(\1\s.+)", r"\2"),
-        # (r"((?:union|enum|struct|class)\s*{[\s\S]+?})(.+)(\s*\1;)", r"\1\2"),
     ]
 
     while True:
