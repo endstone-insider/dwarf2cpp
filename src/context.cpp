@@ -81,9 +81,9 @@ void Context::parse_children(const llvm::DWARFDie &die) // NOLINT(*-no-recursion
 
         if (auto *entry = get(child); entry) {
             auto child_die = child.resolveTypeUnitReference();
-            entry->parse(child_die);
+            entry->parse(*this, child_die);
             if (child_die != child) {
-                entry->parse(child);
+                entry->parse(*this, child);
             }
         }
     }

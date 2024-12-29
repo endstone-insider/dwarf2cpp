@@ -11,6 +11,7 @@
 #include <spdlog/spdlog.h>
 
 #include "algorithm.hpp"
+#include "context.h"
 #include "posixpath.hpp"
 #include "type_printer.h"
 
@@ -85,7 +86,7 @@ std::string parse_template_params(const llvm::DWARFDie &die)
 
 namespace dwarf2cpp {
 
-void Entry::parse(const llvm::DWARFDie &die)
+void Entry::parse(Context &ctx, const llvm::DWARFDie &die)
 {
     // Retrieve the namespace
     std::vector<std::string> namespaces;
@@ -113,9 +114,9 @@ void Entry::parse(const llvm::DWARFDie &die)
     }
 }
 
-void Typedef::parse(const llvm::DWARFDie &die)
+void Typedef::parse(Context &ctx, const llvm::DWARFDie &die)
 {
-    Entry::parse(die);
+    Entry::parse(ctx, die);
     if (auto *buffer = die.getShortName(); buffer) {
         std::string name = buffer;
         names_.emplace_back(name);
@@ -148,7 +149,7 @@ void Typedef::parse(const llvm::DWARFDie &die)
                     break;
                 }
                 if (entry) {
-                    entry->parse(type);
+                    entry->parse(ctx, type);
                     type_ = entry->to_source();
                     type_.pop_back(); // remove the trailing semicolon
                     is_type_alias_ = false;
@@ -167,9 +168,9 @@ std::string Typedef::to_source() const
     return "typedef " + type_ + " " + llvm::join(names_.begin(), names_.end(), ",") + ";";
 }
 
-void Parameter::parse(const llvm::DWARFDie &die)
+void Parameter::parse(Context &ctx, const llvm::DWARFDie &die)
 {
-    Entry::parse(die);
+    Entry::parse(ctx, die);
     if (auto *buffer = die.getShortName(); buffer) {
         name_ = buffer;
     }
@@ -186,9 +187,9 @@ std::string Parameter::to_source() const
     return type_ + " " + name_;
 }
 
-void Function::parse(const llvm::DWARFDie &die)
+void Function::parse(Context &ctx, const llvm::DWARFDie &die)
 {
-    Entry::parse(die);
+    Entry::parse(ctx, die);
     if (auto *buffer = die.getShortName(); buffer) {
         name_ = buffer;
     }
@@ -223,7 +224,7 @@ void Function::parse(const llvm::DWARFDie &die)
     if (auto attr = die.find(llvm::dwarf::DW_AT_virtuality); attr.has_value()) {
         virtuality_ = static_cast<llvm::dwarf::VirtualityAttribute>(attr->getAsUnsignedConstant().value());
     }
-    if (auto parameters = parse_parameters(die); !parameters.empty()) {
+    if (auto parameters = parse_parameters(ctx, die); !parameters.empty()) {
         parameters_ = parameters;
     }
     if (auto template_params = parse_template_params(die); !template_params.empty()) {
@@ -231,7 +232,7 @@ void Function::parse(const llvm::DWARFDie &die)
     }
 }
 
-std::vector<Parameter> Function::parse_parameters(const llvm::DWARFDie &die)
+std::vector<Parameter> Function::parse_parameters(Context &ctx, const llvm::DWARFDie &die)
 {
     std::vector<Parameter> result;
     bool first_param = true;
@@ -254,7 +255,7 @@ std::vector<Parameter> Function::parse_parameters(const llvm::DWARFDie &die)
             }
             else {
                 auto &param = result.emplace_back();
-                param.parse(child);
+                param.parse(ctx, child);
             }
             first_param = false;
             break;
@@ -308,9 +309,9 @@ std::string Function::to_source() const
     return ss.str();
 }
 
-void Enum::parse(const llvm::DWARFDie &die)
+void Enum::parse(Context &ctx, const llvm::DWARFDie &die)
 {
-    Entry::parse(die);
+    Entry::parse(ctx, die);
     if (auto *buffer = die.getShortName(); buffer) {
         name_ = buffer;
     }
@@ -369,9 +370,9 @@ std::string Enum::to_source() const
     return ss.str();
 }
 
-void Field::parse(const llvm::DWARFDie &die)
+void Field::parse(Context &ctx, const llvm::DWARFDie &die)
 {
-    Entry::parse(die);
+    Entry::parse(ctx, die);
     if (auto *buffer = die.getShortName(); buffer) {
         name_ = buffer;
     }
@@ -410,7 +411,7 @@ void Field::parse(const llvm::DWARFDie &die)
                 break;
             }
             if (entry) {
-                entry->parse(type);
+                entry->parse(ctx, type);
                 type_before_ = entry->to_source();
                 type_before_.pop_back(); // remove the trailing semicolon
                 type_after_.clear();
@@ -497,9 +498,9 @@ std::string Field::to_source() const
     return ss.str();
 }
 
-void StructLike::parse(const llvm::DWARFDie &die)
+void StructLike::parse(Context &ctx, const llvm::DWARFDie &die)
 {
-    Entry::parse(die);
+    Entry::parse(ctx, die);
     if (auto *buffer = die.getShortName(); buffer) {
         name_ = buffer;
     }
@@ -612,7 +613,7 @@ void StructLike::parse(const llvm::DWARFDie &die)
 
         std::size_t decl_line = child.getDeclLine();
         if (entry && decl_line > 0) {
-            entry->parse(child);
+            entry->parse(ctx, child);
             members[decl_line].emplace_back(std::move(entry));
         }
     }

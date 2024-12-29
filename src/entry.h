@@ -14,7 +14,7 @@ class Context;
 class Entry {
 public:
     virtual ~Entry() = default;
-    virtual void parse(const llvm::DWARFDie &die);
+    virtual void parse(Context &ctx, const llvm::DWARFDie &die);
     [[nodiscard]] virtual std::string to_source() const = 0;
 
     [[nodiscard]] std::vector<std::string> namespaces() const
@@ -35,7 +35,7 @@ private:
 class Typedef : public Entry {
 public:
     using Entry::Entry;
-    void parse(const llvm::DWARFDie &die) override;
+    void parse(Context &ctx, const llvm::DWARFDie &die) override;
     [[nodiscard]] std::string to_source() const override;
 
 private:
@@ -47,7 +47,7 @@ private:
 class Parameter : public Entry {
 public:
     using Entry::Entry;
-    void parse(const llvm::DWARFDie &die) override;
+    void parse(Context &ctx, const llvm::DWARFDie &die) override;
     [[nodiscard]] std::string to_source() const override;
 
 private:
@@ -58,11 +58,11 @@ private:
 class Function : public Entry {
 public:
     explicit Function(bool is_member) : is_member_(is_member) {}
-    void parse(const llvm::DWARFDie &die) override;
+    void parse(Context &ctx, const llvm::DWARFDie &die) override;
     [[nodiscard]] std::string to_source() const override;
 
 private:
-    std::vector<Parameter> parse_parameters(const llvm::DWARFDie &die);
+    std::vector<Parameter> parse_parameters(Context &ctx, const llvm::DWARFDie &die);
 
     std::string name_;
     std::string linkage_name_;
@@ -85,7 +85,7 @@ public:
         std::int64_t value;
     };
     using Entry::Entry;
-    void parse(const llvm::DWARFDie &die) override;
+    void parse(Context &ctx, const llvm::DWARFDie &die) override;
     [[nodiscard]] std::string to_source() const override;
 
 private:
@@ -100,7 +100,7 @@ private:
 class Field : public Entry {
 public:
     using Entry::Entry;
-    void parse(const llvm::DWARFDie &die) override;
+    void parse(Context &ctx, const llvm::DWARFDie &die) override;
     [[nodiscard]] std::string to_source() const override;
 
 private:
@@ -122,7 +122,7 @@ public:
         Union,
     };
     explicit StructLike(Kind kind) : kind_(kind) {}
-    void parse(const llvm::DWARFDie &die) override;
+    void parse(Context &ctx, const llvm::DWARFDie &die) override;
     [[nodiscard]] std::string to_source() const override;
 
 private:
