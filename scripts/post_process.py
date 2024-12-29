@@ -33,7 +33,7 @@ def process_file(args):
         "std::chrono::time_point<std::chrono::steady_clock, std::chrono::duration<long long, std::ratio<1L, 1000000000L> > >",
         "std::chrono::steady_clock::time_point",
     )
-    # content = re.sub(r"\(lambda at .+?\)", "Lambda", content)
+    content = re.sub(r"\(lambda at .+?\)", "Lambda", content)
 
     pattern_repl = [
         # std::unique_ptr
