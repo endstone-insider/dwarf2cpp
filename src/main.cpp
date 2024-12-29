@@ -6,7 +6,6 @@
 #include <spdlog/spdlog.h>
 
 #include "context.h"
-#include "entry.h"
 #include "llvm/DebugInfo/DWARF/DWARFContext.h"
 #include "llvm/Object/ObjectFile.h"
 #include "llvm/Support/Error.h"
@@ -72,7 +71,6 @@ int main(int argc, char **argv)
 
         auto name = cu_die.getShortName();
         spdlog::info("[{}/{}] Parsing compile unit {}", ++i, num_compile_units, name);
-
         ctx.update(cu_die);
     }
 

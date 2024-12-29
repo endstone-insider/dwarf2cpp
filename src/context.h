@@ -14,11 +14,15 @@ public:
     [[nodiscard]] std::string base_dir() const;
     [[nodiscard]] const std::unordered_map<std::string, SourceFile> &source_files() const;
 
+    Entry *get(const llvm::DWARFDie &index);
+
 private:
-    void parse_children(const llvm::DWARFDie &die, std::vector<std::string> &namespaces);
+    void parse_children(const llvm::DWARFDie &die);
 
     std::string base_dir_;
     std::unordered_map<std::string, SourceFile> source_files_;
+    std::unordered_map<std::size_t, std::unique_ptr<Entry>> info_entries_;
+    std::unordered_map<std::size_t, std::unique_ptr<Entry>> type_entries_;
 };
 
 }; // namespace dwarf2cpp
