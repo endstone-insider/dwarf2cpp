@@ -196,10 +196,12 @@ void Function::parse(const llvm::DWARFDie &die)
         linkage_name_ = buffer;
     }
     if (auto type = die.getAttributeValueAsReferencedDie(llvm::dwarf::DW_AT_type); type.isValid()) {
+        std::string return_type;
         type = type.resolveTypeUnitReference();
-        llvm::raw_string_ostream os(return_type_);
+        llvm::raw_string_ostream os(return_type);
         llvm::DWARFTypePrinter type_printer(os);
         type_printer.appendQualifiedName(type);
+        return_type_ = return_type;
     }
     else {
         return_type_ = "void";

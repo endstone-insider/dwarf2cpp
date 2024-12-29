@@ -41,55 +41,34 @@ const std::unordered_map<std::string, SourceFile> &Context::source_files() const
 Entry *Context::get(const llvm::DWARFDie &index)
 {
     const auto die = index.resolveTypeUnitReference();
-    auto &map = die.getDwarfUnit()->isTypeUnit() ? type_entries_ : info_entries_;
+    if (!die.find(llvm::dwarf::DW_AT_name) || !die.find(llvm::dwarf::DW_AT_decl_file) ||
+        !die.find(llvm::dwarf::DW_AT_decl_line)) {
+        return nullptr;
+    }
 
-    if (const auto it = map.find(die.getOffset()); it == map.end()) {
-        if (!die.find(llvm::dwarf::DW_AT_name) || !die.find(llvm::dwarf::DW_AT_decl_file) ||
-            !die.find(llvm::dwarf::DW_AT_decl_line)) {
-            return nullptr;
-        }
+    auto decl_file = die.getDeclFile(llvm::DILineInfoSpecifier::FileLineInfoKind::AbsoluteFilePath);
+    std::replace(decl_file.begin(), decl_file.end(), '\\', '/');
+    decl_file = posixpath::normpath(decl_file);
 
-        // Parse the DIE if we haven't and add the entry to the corresponding source file
-        std::unique_ptr<Entry> entry;
+    Entry *existing_entry = nullptr;
+    if (const auto it = source_files_.find(decl_file); it != source_files_.end()) {
+        existing_entry = it->second.get(die);
+    }
+
+    if (!existing_entry) {
         switch (die.getTag()) {
         case llvm::dwarf::DW_TAG_class_type:
-            entry = std::make_unique<StructLike>(StructLike::Kind::Class);
-            if (auto *buffer = die.getShortName(); buffer) {
-                if (std::string(buffer) == "AABB") {
-                    spdlog::warn("AABB at {}", die.getOffset());
-                }
-            }
-            break;
         case llvm::dwarf::DW_TAG_enumeration_type:
-            entry = std::make_unique<Enum>();
-            break;
         case llvm::dwarf::DW_TAG_structure_type:
-            entry = std::make_unique<StructLike>(StructLike::Kind::Struct);
-            break;
         case llvm::dwarf::DW_TAG_typedef:
-            entry = std::make_unique<Typedef>();
-            break;
         case llvm::dwarf::DW_TAG_union_type:
-            entry = std::make_unique<StructLike>(StructLike::Kind::Union);
-            break;
         case llvm::dwarf::DW_TAG_subprogram:
-            entry = std::make_unique<Function>(false);
-            break;
+            return source_files_[decl_file].add(die);
         default:
             return nullptr;
         }
-
-        entry->parse(die);
-
-        auto decl_file = die.getDeclFile(llvm::DILineInfoSpecifier::FileLineInfoKind::AbsoluteFilePath);
-        std::replace(decl_file.begin(), decl_file.end(), '\\', '/');
-        decl_file = posixpath::normpath(decl_file);
-        auto &sf = source_files_[decl_file];
-        sf.add(die.getDeclLine(), entry.get());
-        map[die.getOffset()] = std::move(entry);
     }
-
-    return map.at(die.getOffset()).get();
+    return existing_entry;
 }
 
 void Context::parse_children(const llvm::DWARFDie &die) // NOLINT(*-no-recursion)
@@ -100,8 +79,12 @@ void Context::parse_children(const llvm::DWARFDie &die) // NOLINT(*-no-recursion
             continue;
         }
 
-        if (auto *entry = get(child); entry && child.resolveTypeUnitReference() != child) {
-            entry->parse(child);
+        if (auto *entry = get(child); entry) {
+            auto child_die = child.resolveTypeUnitReference();
+            entry->parse(child_die);
+            if (child_die != child) {
+                entry->parse(child);
+            }
         }
     }
 }

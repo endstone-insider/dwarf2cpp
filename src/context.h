@@ -21,8 +21,6 @@ private:
 
     std::string base_dir_;
     std::unordered_map<std::string, SourceFile> source_files_;
-    std::unordered_map<std::size_t, std::unique_ptr<Entry>> info_entries_;
-    std::unordered_map<std::size_t, std::unique_ptr<Entry>> type_entries_;
 };
 
 }; // namespace dwarf2cpp

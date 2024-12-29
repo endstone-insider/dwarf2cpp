@@ -5,9 +5,61 @@
 
 namespace dwarf2cpp {
 
-void SourceFile::add(std::size_t line, Entry *entry)
+Entry *SourceFile::add(const llvm::DWARFDie &die)
 {
-    lines_[line].push_back(entry);
+    std::size_t decl_line = die.getDeclLine();
+    std::string short_name = die.getShortName();
+
+    if (get(die)) {
+        throw std::runtime_error("Duplicate declaration");
+    }
+
+    if (auto it = lines_.find(decl_line); it != lines_.end()) {
+        if (it->second.size() > 16) { // TODO: avoid magic number?
+            return nullptr;
+        }
+    }
+
+    std::unique_ptr<Entry> entry;
+    switch (die.getTag()) {
+    case llvm::dwarf::DW_TAG_class_type:
+        entry = std::make_unique<StructLike>(StructLike::Kind::Class);
+        break;
+    case llvm::dwarf::DW_TAG_enumeration_type:
+        entry = std::make_unique<Enum>();
+        break;
+    case llvm::dwarf::DW_TAG_structure_type:
+        entry = std::make_unique<StructLike>(StructLike::Kind::Struct);
+        break;
+    case llvm::dwarf::DW_TAG_typedef:
+        entry = std::make_unique<Typedef>();
+        break;
+    case llvm::dwarf::DW_TAG_union_type:
+        entry = std::make_unique<StructLike>(StructLike::Kind::Union);
+        break;
+    case llvm::dwarf::DW_TAG_subprogram:
+        entry = std::make_unique<Function>(false);
+        break;
+    default:
+        return nullptr;
+    }
+
+    const auto &ref = lines_[decl_line].emplace_back(std::move(entry));
+    lookup_map_[decl_line][short_name] = ref.get();
+    return ref.get();
+}
+
+Entry *SourceFile::get(const llvm::DWARFDie &die)
+{
+    std::size_t decl_line = die.getDeclLine();
+    std::string short_name = die.getShortName();
+    if (lookup_map_.find(decl_line) == lookup_map_.end()) {
+        return nullptr;
+    }
+    if (lookup_map_[decl_line].find(short_name) == lookup_map_[decl_line].end()) {
+        return nullptr;
+    }
+    return lookup_map_[decl_line][short_name];
 }
 
 std::string SourceFile::to_source() const

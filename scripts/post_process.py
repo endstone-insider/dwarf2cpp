@@ -3,10 +3,8 @@ import subprocess
 from pathlib import Path
 import argparse
 import glob
-from concurrent.futures import ProcessPoolExecutor
+from tqdm.contrib.concurrent import process_map
 import re
-
-from tqdm import tqdm
 
 
 def process_file(args):
@@ -151,16 +149,7 @@ def main():
         if os.path.isfile(file)
     ]
 
-    # Process the files using a multiprocessing pool with tqdm for progress tracking
-    with ProcessPoolExecutor() as executor:
-        list(
-            tqdm(
-                executor.map(process_file, files_with_paths),
-                total=len(files_with_paths),
-                desc="Processing files",
-            )
-        )
-
+    process_map(process_file, files_with_paths, desc="Processing files", chunksize=1)
     print("Processing complete!")
 
 
