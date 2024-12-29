@@ -6,6 +6,8 @@ find_package(LLVM REQUIRED)
 find_package(spdlog REQUIRED)
 
 add_executable(dwarf2cpp src/main.cpp
+        src/context.cpp
+        src/context.h
         src/entry.cpp
         src/entry.h
         src/source_file.cpp
