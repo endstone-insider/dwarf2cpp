@@ -8,15 +8,14 @@
 
 namespace dwarf2cpp {
 
-class SourceFile {
+class SourceFile : public Entry {
 public:
-    void add(std::size_t line, std::unique_ptr<Entry> entry);
-    Entry *get(std::size_t line);
-    [[nodiscard]] std::string to_source() const;
+    void add(std::size_t decl_line, Entry *entry);
+    [[nodiscard]] std::string to_source() const override;
     friend std::ostream &operator<<(std::ostream &os, const SourceFile &sf);
 
 private:
-    std::map<std::size_t, std::unique_ptr<Entry>> lines_;
+    std::map<std::size_t, std::vector<Entry *>> lines_;
 };
 
 } // namespace dwarf2cpp
