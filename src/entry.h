@@ -62,7 +62,7 @@ public:
     [[nodiscard]] std::string to_source() const override;
 
 private:
-    void parse_children(const llvm::DWARFDie &die);
+    std::vector<Parameter> parse_parameters(const llvm::DWARFDie &die);
 
     std::string name_;
     std::string linkage_name_;

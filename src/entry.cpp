@@ -223,16 +223,17 @@ void Function::parse(const llvm::DWARFDie &die)
     if (auto attr = die.find(llvm::dwarf::DW_AT_virtuality); attr.has_value()) {
         virtuality_ = static_cast<llvm::dwarf::VirtualityAttribute>(attr->getAsUnsignedConstant().value());
     }
-    if (parameters_.empty()) {
-        parse_children(die);
+    if (auto parameters = parse_parameters(die); !parameters.empty()) {
+        parameters_ = parameters;
     }
     if (auto template_params = parse_template_params(die); !template_params.empty()) {
         template_params_ = template_params;
     }
 }
 
-void Function::parse_children(const llvm::DWARFDie &die)
+std::vector<Parameter> Function::parse_parameters(const llvm::DWARFDie &die)
 {
+    std::vector<Parameter> result;
     bool first_param = true;
     for (const auto &child : die.children()) {
         switch (child.getTag()) {
@@ -252,7 +253,7 @@ void Function::parse_children(const llvm::DWARFDie &die)
                 is_static_ = false;
             }
             else {
-                auto &param = parameters_.emplace_back();
+                auto &param = result.emplace_back();
                 param.parse(child);
             }
             first_param = false;
@@ -262,6 +263,7 @@ void Function::parse_children(const llvm::DWARFDie &die)
             break;
         }
     }
+    return result;
 }
 
 std::string Function::to_source() const
