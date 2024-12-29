@@ -81,19 +81,34 @@ std::string parse_template_params(const llvm::DWARFDie &die)
     return result;
 }
 
-void remove_lambda(std::string &target)
-{
-    static std::regex pattern(R"(\(lambda at .+?\))");
-    target = std::regex_replace(target, pattern, "Lambda");
-}
-
 } // namespace
 
 namespace dwarf2cpp {
 
 void Entry::parse(const llvm::DWARFDie &die)
 {
-    if (auto attr = die.find(llvm::dwarf::DW_AT_accessibility); attr) {
+    // Retrieve the namespace
+    std::vector<std::string> namespaces;
+    for (auto current = die.getParent(); current.isValid(); current = current.getParent()) {
+        if (current.getTag() == llvm::dwarf::DW_TAG_namespace) {
+            if (auto *name = current.getShortName(); name) {
+                namespaces.emplace_back(name);
+            }
+            else {
+                namespaces.emplace_back("");
+            }
+        }
+        else {
+            break;
+        }
+    }
+    if (!namespaces.empty()) {
+        std::reverse(namespaces.begin(), namespaces.end());
+        namespaces_ = std::move(namespaces);
+    }
+
+    // Get accessibility (if set)
+    if (const auto attr = die.find(llvm::dwarf::DW_AT_accessibility); attr) {
         access_ = static_cast<llvm::dwarf::AccessAttribute>(attr->getAsUnsignedConstant().value());
     }
 }
@@ -103,7 +118,6 @@ void Typedef::parse(const llvm::DWARFDie &die)
     Entry::parse(die);
     if (auto *buffer = die.getShortName(); buffer) {
         std::string name = buffer;
-        remove_lambda(name);
         names_.emplace_back(name);
         const auto last = std::unique(names_.begin(), names_.end());
         names_.erase(last, names_.end());
@@ -114,7 +128,6 @@ void Typedef::parse(const llvm::DWARFDie &die)
             llvm::raw_string_ostream os(type_);
             llvm::DWARFTypePrinter type_printer(os);
             type_printer.appendQualifiedName(type);
-            remove_lambda(type_);
             if (!type.getShortName()) {
                 // check if this is anonymous class defined in place
                 std::unique_ptr<Entry> entry;
@@ -165,7 +178,6 @@ void Parameter::parse(const llvm::DWARFDie &die)
         llvm::raw_string_ostream os(type_);
         llvm::DWARFTypePrinter type_printer(os);
         type_printer.appendQualifiedName(type);
-        remove_lambda(type_);
     }
 }
 
@@ -179,7 +191,6 @@ void Function::parse(const llvm::DWARFDie &die)
     Entry::parse(die);
     if (auto *buffer = die.getShortName(); buffer) {
         name_ = buffer;
-        remove_lambda(name_);
     }
     if (auto *buffer = die.getLinkageName(); buffer) {
         linkage_name_ = buffer;
@@ -323,7 +334,14 @@ void Enum::parse_children(const llvm::DWARFDie &die)
         }
         Enumerator enumerator;
         enumerator.name = child.getShortName();
-        enumerator.value = child.find(llvm::dwarf::DW_AT_const_value)->getAsSignedConstant().value();
+
+        auto value = child.find(llvm::dwarf::DW_AT_const_value);
+        if (value->getForm() == llvm::dwarf::DW_FORM_sdata) {
+            enumerator.value = value->getAsSignedConstant().value();
+        }
+        else {
+            enumerator.value = value->getAsUnsignedConstant().value();
+        }
         enumerators_.push_back(enumerator);
     }
 }
@@ -443,7 +461,22 @@ std::string Field::to_source() const
             ss << std::fixed << std::setprecision(max_precision) << *reinterpret_cast<double *>(&value);
         }
         else if (endswith(type_before_, "char")) {
-            ss << "'" << static_cast<char>(default_value_.value()) << "'";
+            auto val = default_value_.value();
+            if ((val & ~0xFFu) == ~0xFFu) {
+                val &= 0xFFu;
+            }
+            if (val < 127 && val >= 32) {
+                ss << "'" << static_cast<char>(default_value_.value()) << "'";
+            }
+            else if (val < 256) {
+                ss << "'\\x" << std::setw(2) << std::setfill('0') << std::hex << val << PRIx64 << "'";
+            }
+            else if (val <= 0xFFFF) {
+                ss << "'\\u" << std::setw(4) << std::setfill('0') << std::hex << val << PRIx64 << "'";
+            }
+            else {
+                ss << "'\\U" << std::setw(8) << std::setfill('0') << std::hex << val << PRIx64 << "'";
+            }
         }
         else if (endswith(type_before_, "bool")) {
             ss << (default_value_.value() ? "true" : "false");
@@ -465,7 +498,6 @@ void StructLike::parse(const llvm::DWARFDie &die)
     Entry::parse(die);
     if (auto *buffer = die.getShortName(); buffer) {
         name_ = buffer;
-        remove_lambda(name_);
     }
     if (auto attr = die.find(llvm::dwarf::DW_AT_byte_size); attr) {
         byte_size = attr->getAsUnsignedConstant().value();
