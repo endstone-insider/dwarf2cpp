@@ -612,7 +612,7 @@ void StructLike::parse(Context &ctx, const llvm::DWARFDie &die)
         }
 
         std::size_t decl_line = child.getDeclLine();
-        if (entry && decl_line > 0) {
+        if (entry && decl_line > 0 && members[decl_line].size() <= 16) {
             entry->parse(ctx, child);
             members[decl_line].emplace_back(std::move(entry));
         }
@@ -625,17 +625,10 @@ void StructLike::parse(Context &ctx, const llvm::DWARFDie &die)
         member.erase(last, member.end());
 
         if (auto it = members_.find(decl_line); it != members_.end()) {
-            if (member.size() >= it->second.size()) {
-                it->second.clear();
-                for (auto &m : member) {
-                    it->second.emplace_back(std::move(m));
-                }
-            }
+            it->second = std::move(member);
         }
         else {
-            for (auto &m : member) {
-                members_[decl_line].emplace_back(std::move(m));
-            }
+            members_[decl_line] = std::move(member);
         }
     }
 
@@ -684,9 +677,13 @@ std::string StructLike::to_source() const
     ss << " {\n";
 
     auto last_access = default_access;
+    bool first_line = true;
     for (const auto &[decl_line, member] : members_) {
         for (const auto &m : member) {
             if (auto current_access = m->access().value_or(default_access); current_access != last_access) {
+                if (!first_line) {
+                    ss << "\n";
+                }
                 ss << to_string(current_access) << ":\n";
                 last_access = current_access;
             }
@@ -697,11 +694,12 @@ std::string StructLike::to_source() const
                 ss << "    " << line << "\n";
             }
         }
+        first_line = false;
     }
     ss << "};";
     if (!name_.empty() && byte_size.has_value()) {
         ss << "\n";
-        ss << "static_assert(sizeof(" << name_ << ") == " << byte_size.value() << ");\n";
+        ss << "static_assert(sizeof(" << name_ << ") == " << byte_size.value() << ");";
     }
     return ss.str();
 }

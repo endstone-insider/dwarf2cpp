@@ -66,7 +66,12 @@ std::string SourceFile::to_source() const
 {
     std::stringstream ss;
     std::vector<std::string> prev_ns;
+    bool first_line = true;
     for (const auto &[line, entries] : lines_) {
+        if (!first_line) {
+            ss << "\n";
+        }
+
         for (const auto &entry : entries) {
             // Get current namespaces
             const auto &current_ns = entry->namespaces();
@@ -82,6 +87,10 @@ std::string SourceFile::to_source() const
                 ss << "} // namespace " << prev_ns[i - 1] << "\n";
             }
 
+            if (level > 0) {
+                ss << "\n";
+            }
+
             // Open new namespaces
             for (size_t i = level; i < current_ns.size(); ++i) {
                 ss << "namespace " << current_ns[i] << " {\n";
@@ -91,9 +100,10 @@ std::string SourceFile::to_source() const
             prev_ns = current_ns;
 
             // Print the line and entry's source code
-            ss << "// Line " << line << "\n";
             ss << entry->to_source() << "\n";
         }
+
+        first_line = false;
     }
 
     // Close any remaining open namespaces
