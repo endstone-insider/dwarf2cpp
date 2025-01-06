@@ -105,10 +105,15 @@ def process_file(args):
 
     # Call clang-format on the file
     clang_format_file = os.path.join(os.path.dirname(__file__), ".clang-format")
-    subprocess.run(
-        ["clang-format", "-i", f"-style=file:{clang_format_file}", result_file],
-        check=True,
-    )
+    try:
+        subprocess.run(
+            ["clang-format", "-i", f"-style=file:{clang_format_file}", result_file],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except subprocess.CalledProcessError as e:
+        print("Error occurred: ", e.stderr)
 
 
 def main():

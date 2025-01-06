@@ -40,6 +40,9 @@ Entry *SourceFile::add(const llvm::DWARFDie &die)
     case llvm::dwarf::DW_TAG_subprogram:
         entry = std::make_unique<Function>(false);
         break;
+    case llvm::dwarf::DW_TAG_variable:
+        entry = std::make_unique<Field>();
+        break;
     default:
         return nullptr;
     }

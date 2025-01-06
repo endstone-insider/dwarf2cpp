@@ -381,15 +381,19 @@ void Field::parse(Context &ctx, const llvm::DWARFDie &die)
         llvm::DWARFDie inner;
         // before name
         {
-            llvm::raw_string_ostream os(type_before_);
+            std::string type_before;
+            llvm::raw_string_ostream os(type_before);
             llvm::DWARFTypePrinter type_printer(os);
             inner = type_printer.appendQualifiedNameBefore(type);
+            type_before_ = type_before;
         }
         // after name
         {
-            llvm::raw_string_ostream os(type_after_);
+            std::string type_after;
+            llvm::raw_string_ostream os(type_after);
             llvm::DWARFTypePrinter type_printer(os);
             type_printer.appendUnqualifiedNameAfter(type, inner);
+            type_after_ = type_after;
         }
         if (!type.getShortName()) {
             // check if this is anonymous class defined in place

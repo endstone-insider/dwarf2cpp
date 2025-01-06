@@ -63,6 +63,7 @@ Entry *Context::get(const llvm::DWARFDie &index)
         case llvm::dwarf::DW_TAG_typedef:
         case llvm::dwarf::DW_TAG_union_type:
         case llvm::dwarf::DW_TAG_subprogram:
+        case llvm::dwarf::DW_TAG_variable:
             return source_files_[decl_file].add(die);
         default:
             return nullptr;
