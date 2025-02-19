@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 from pathlib import Path
 import argparse
@@ -138,7 +139,11 @@ def main():
     args = parser.parse_args()
 
     # Ensure the output directory exists
-    Path(args.output).mkdir(parents=True, exist_ok=True)
+    output_path = Path(args.output)
+    if output_path.exists():
+        shutil.rmtree(output_path)
+    else:
+        output_path.mkdir(parents=True, exist_ok=True)
 
     # Find all files in the input directory
     input_files = glob.glob(str(Path(args.input) / "**" / "*.*"), recursive=True)

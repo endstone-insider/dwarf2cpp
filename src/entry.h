@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -116,7 +117,7 @@ private:
 
 class StructLike : public Entry {
 public:
-    enum class Kind {
+    enum class Kind : std::uint8_t {
         Struct,
         Class,
         Union,
@@ -128,8 +129,9 @@ public:
 private:
     std::string name_;
     Kind kind_;
+    int alignment_{0};
     std::map<std::size_t, std::vector<std::unique_ptr<Entry>>> members_;
-    std::optional<std::size_t> byte_size;
+    std::optional<std::size_t> byte_size_;
     std::vector<std::pair<llvm::dwarf::AccessAttribute, std::string>> base_classes_;
     std::string template_params_;
 };

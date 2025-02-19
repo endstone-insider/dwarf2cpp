@@ -39,3 +39,6 @@ build/*
 
 # Intellj IDEA
 .idea/*
+
+# Project specific file
+bin/

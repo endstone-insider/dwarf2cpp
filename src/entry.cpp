@@ -509,7 +509,10 @@ void StructLike::parse(Context &ctx, const llvm::DWARFDie &die)
         name_ = buffer;
     }
     if (auto attr = die.find(llvm::dwarf::DW_AT_byte_size); attr) {
-        byte_size = attr->getAsUnsignedConstant().value();
+        byte_size_ = attr->getAsUnsignedConstant().value();
+    }
+    if (auto attr = die.find(llvm::dwarf::DW_AT_alignment); attr) {
+        alignment_ = attr->getAsUnsignedConstant().value();
     }
 
     std::string decl_file = die.getDeclFile(llvm::DILineInfoSpecifier::FileLineInfoKind::AbsoluteFilePath);
@@ -664,6 +667,9 @@ std::string StructLike::to_source() const
         ss << "union ";
         break;
     }
+    if (alignment_ > 0) {
+        ss << "alignas(" << alignment_ << ") ";
+    }
     ss << name_;
     if (!base_classes_.empty()) {
         ss << ": ";
@@ -701,9 +707,9 @@ std::string StructLike::to_source() const
         first_line = false;
     }
     ss << "};";
-    if (!name_.empty() && byte_size.has_value()) {
+    if (!name_.empty() && byte_size_.has_value()) {
         ss << "\n";
-        ss << "static_assert(sizeof(" << name_ << ") == " << byte_size.value() << ");";
+        ss << "static_assert(sizeof(" << name_ << ") == " << byte_size_.value() << ");";
     }
     return ss.str();
 }
