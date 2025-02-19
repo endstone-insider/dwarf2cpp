@@ -113,6 +113,7 @@ private:
     bool is_static_{false};
     bool is_mutable_{false};
     std::optional<std::int64_t> default_value_;
+    std::string template_params_;
 };
 
 class StructLike : public Entry {

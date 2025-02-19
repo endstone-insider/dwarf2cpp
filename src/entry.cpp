@@ -442,11 +442,17 @@ void Field::parse(Context &ctx, const llvm::DWARFDie &die)
             default_value_ = attr->getAsUnsignedConstant().value();
         }
     }
+    if (auto template_params = parse_template_params(die); !template_params.empty()) {
+        template_params_ = template_params;
+    }
 }
 
 std::string Field::to_source() const
 {
     std::stringstream ss;
+    if (!template_params_.empty()) {
+        ss << "// " << template_params_ << "\n";
+    }
     if (is_static_) {
         ss << "static ";
     }
