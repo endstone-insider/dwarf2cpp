@@ -3,6 +3,7 @@ from pathlib import Path
 
 import click
 from jinja2 import Environment, FileSystemLoader
+from tqdm import tqdm
 
 from ._dwarf import DWARFContext
 from .filters import do_ns_actions, do_ns_chain, do_type_cleanup
@@ -34,11 +35,13 @@ def main(path: Path, base_dir: str, output_path: Path | None):
     env.filters["ns_actions"] = do_ns_actions
     env.filters["type_cleanup"] = do_type_cleanup
 
-    for rel_path, file in visitor.files:
+    for rel_path, file in (pbar := tqdm(visitor.files)):
         result = env.get_template("file.jinja").render(file=file)
         output_file = output_path / rel_path
         output_file.parent.mkdir(parents=True, exist_ok=True)
         with output_file.open("w", encoding="utf-8") as f:
             f.write(result)
 
-        logger.info(f"Generated file: {output_file}")
+        pbar.set_description_str(f"Generating file: {rel_path}")
+
+    logger.info(f"Done! Files generated in: {output_path.absolute()}")

@@ -5,6 +5,8 @@ import struct
 from collections import defaultdict
 from typing import Callable, Generator
 
+from tqdm import tqdm
+
 from ._dwarf import (
     AccessAttribute,
     DWARFContext,
@@ -75,16 +77,22 @@ class Visitor:
         Returns:
             List of files
         """
-        for i, cu in enumerate(self.context.compile_units):
+        for i, cu in (
+            pbar := tqdm(
+                enumerate(self.context.compile_units),
+                total=self.context.num_compile_units,
+                bar_format="[{n_fmt}/{total_fmt}] {desc}",
+            )
+        ):
             cu_die = cu.unit_die
             name = cu_die.short_name
-            num_compile_units = self.context.num_compile_units
             compilation_dir = cu.compilation_dir.replace("\\", "/")
+            rel_path = posixpath.relpath(name, compilation_dir)
             if not compilation_dir.startswith(self._base_dir):
-                logger.info(f"[{i + 1}/{num_compile_units}] Skipping compile unit {name} ({compilation_dir})")
+                pbar.set_description_str(f"Skipping compile unit {rel_path})")
                 continue
 
-            logger.info(f"[{i + 1}/{num_compile_units}] Visiting compile unit {name} ({compilation_dir})")
+            pbar.set_description_str(f"Visiting compile unit {rel_path})")
             self.visit(cu_die)
 
         for key, param_names in self._param_names.items():
