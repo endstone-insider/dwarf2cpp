@@ -6,7 +6,8 @@ from jinja2 import Environment, FileSystemLoader
 from tqdm import tqdm
 
 from ._dwarf import DWARFContext
-from .filters import do_ns_actions, do_ns_chain, do_type_cleanup
+from .filters import do_ns_actions, do_ns_chain
+from .post_process import cleanup
 from .visitor import Visitor
 
 logging.basicConfig(level=logging.INFO)
@@ -33,10 +34,10 @@ def main(path: Path, base_dir: str, output_path: Path | None):
     env = Environment(loader=FileSystemLoader(template_dir), keep_trailing_newline=True)
     env.filters["ns_chain"] = do_ns_chain
     env.filters["ns_actions"] = do_ns_actions
-    env.filters["type_cleanup"] = do_type_cleanup
 
     for rel_path, file in (pbar := tqdm(visitor.files)):
         result = env.get_template("file.jinja").render(file=file)
+        result = cleanup(result)
         output_file = output_path / rel_path
         output_file.parent.mkdir(parents=True, exist_ok=True)
         with output_file.open("w", encoding="utf-8") as f:

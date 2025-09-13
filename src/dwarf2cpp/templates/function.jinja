@@ -3,12 +3,12 @@
 {{- "explicit " if obj.is_explicit -}}
 {{- "inline " if obj.is_inline -}}
 {{- "static " if obj.is_static -}}
-{{- obj.returns | type_cleanup ~ " " if obj.returns -}}
+{{- obj.returns ~ " " if obj.returns -}}
 {{ obj.name }}(
 {%- for parameter in obj.parameters -%}
   {%- if parameter.name != "this" -%}
     {%- if parameter.kind.value == "positional" -%}
-      {{ parameter.type | type_cleanup }}{{ " " ~ parameter.name if parameter.name }}
+      {{ parameter.type }}{{ " " ~ parameter.name if parameter.name }}
     {%- elif parameter.kind.value == "variadic" -%}
       ...
     {%- endif -%}
