@@ -2,6 +2,7 @@
 {{- "virtual " if obj.virtuality -}}
 {{- "explicit " if obj.is_explicit -}}
 {{- "inline " if obj.is_inline -}}
+{{- "static " if obj.is_static -}}
 {{- obj.returns | type_cleanup ~ " " if obj.returns -}}
 {{ obj.name }}(
 {%- for parameter in obj.parameters -%}

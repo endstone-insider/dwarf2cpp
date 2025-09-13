@@ -342,13 +342,17 @@ class Visitor:
             if spec.offset not in self._cache:
                 return
 
+            declaration = self._cache[spec.offset]
+            # check if we have object pointer (i.e., this), if not, then this is a static member function
+            if not die.find("DW_AT_object_pointer"):
+                declaration.is_static = True
+
             # this is a definition outside the body of the namespace, use fully qualified name
             printer = DWARFTypePrinter()
             printer.append_scopes(spec.parent)
             printer.append_unqualified_name(spec)
             name = str(printer)
 
-            declaration = self._cache[spec.offset]
             function = Function(name=name, returns=declaration.returns)
         else:
             if die.find("DW_AT_artificial") is not None:

@@ -74,6 +74,7 @@ class Function(Object):
     is_explicit: bool = False
     is_deleted: bool = False
     is_inline: bool = False
+    is_static: bool = False
     virtuality: VirtualityAttribute | None = None
 
 
