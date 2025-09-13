@@ -16,5 +16,6 @@
   {%- endif -%}
 {%- endfor -%}
 )
+{{- " const" if obj.is_const -}}
 {{- " = 0" if obj.virtuality and obj.virtuality.name == "PURE_VIRTUAL" -}}
 {{- " = delete" if obj.is_deleted -}}

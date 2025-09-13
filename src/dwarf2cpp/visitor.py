@@ -351,9 +351,20 @@ class Visitor:
                 return
 
             declaration = self._cache[spec.offset]
-            # check if we have object pointer (i.e., this), if not, then this is a static member function
-            if not die.find("DW_AT_object_pointer"):
+
+            op = die.find("DW_AT_object_pointer")
+            if not op:
+                # check if we have object pointer (i.e., this), if not, then this is a static member function
                 declaration.is_static = True
+            else:
+                op = op.as_referenced_die()
+                t = op.find("DW_AT_type")
+                while t:
+                    t = t.as_referenced_die()
+                    if t.tag == "DW_TAG_const_type":
+                        declaration.is_const = True
+                        break
+                    t = t.find("DW_AT_type")
 
             # this is a definition outside the body of the namespace, use fully qualified name
             printer = DWARFTypePrinter()
@@ -361,7 +372,7 @@ class Visitor:
             printer.append_unqualified_name(spec)
             name = str(printer)
 
-            function = Function(name=name, returns=declaration.returns)
+            function = Function(name=name, returns=declaration.returns, is_const=declaration.is_const)
         else:
             if die.find("DW_AT_artificial") is not None:
                 return
