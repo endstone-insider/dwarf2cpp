@@ -420,13 +420,10 @@ class Visitor:
                     function.is_explicit = True
                 case "DW_AT_object_pointer":
                     pass
-                    # object_pointer = attribute.value.as_referenced_die()
-                    # print(object_pointer.dump())
                 case "DW_AT_abstract_origin":
                     pass
-                    # print(spec.dump())
                 case "DW_AT_accessibility":
-                    pass
+                    function.access = AccessAttribute(attribute.value.as_constant())
                 case "DW_AT_virtuality":
                     function.virtuality = VirtualityAttribute(attribute.value.as_constant())
                     assert function.virtuality != VirtualityAttribute.NONE, "Expected non-NONE virtuality"
@@ -604,7 +601,7 @@ class Visitor:
                 case "DW_AT_alignment":
                     variable.alignment = attribute.value.as_constant()
                 case "DW_AT_accessibility":
-                    pass  # TODO:
+                    variable.access = AccessAttribute(attribute.value.as_constant())
                 case "DW_AT_data_member_location":
                     pass
                 case "DW_AT_bit_size":
@@ -650,7 +647,7 @@ class Visitor:
                 case "DW_AT_alignment":
                     struct.alignment = attribute.value.as_constant()
                 case "DW_AT_accessibility":
-                    pass
+                    struct.access = AccessAttribute(attribute.value.as_constant())
                 case _:
                     print(die.dump())
                     raise ValueError(f"Unhandled attribute {attribute.name}")

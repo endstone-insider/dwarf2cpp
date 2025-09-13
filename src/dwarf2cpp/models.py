@@ -11,6 +11,7 @@ class Object:
     name: str
     parent: "Namespace | None" = None
     is_implicit: bool = False
+    access: AccessAttribute | None = None
 
 
 @dataclass
