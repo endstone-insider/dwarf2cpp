@@ -23,7 +23,7 @@ build it:
 * On macOS: **Apple Clang (Xcode Command Line Tools)**
 
 ```
-git clone https://github.com/yourusername/dwarf2cpp.git
+git clone https://github.com/endstone-insider/dwarf2cpp.git
 cd dwarf2cpp
 pip install .
 ```
