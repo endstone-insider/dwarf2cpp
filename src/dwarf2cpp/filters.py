@@ -45,20 +45,30 @@ def do_insert_name(tp: str, name: str):
         arrays = m.group("arrays").strip()
         return f"{base} {name}{arrays}"
 
-    # Plain C-style function pointer:  RET (* )(ARGS...)
+    # Plain C-style function pointer:  RET (*)(ARGS)
     m = re.match(r"^(?P<ret>.+?)\s*\(\s*\*\s*\)\s*\((?P<args>.*)\)$", t)
     if m:
         ret = m.group("ret").strip()
         args = m.group("args").strip()
         return f"{ret} (*{name})({args})"
 
-    # # Member function pointer:  RET (Class::*)(ARGS...) [cv/ref qualifiers]
-    # m = re.match(r'^(?P<ret>.+?)\s*\(\s*(?P<cls>.+::\*)\s*\)\s*(?P<rest>.*)$', t)
-    # if m:
-    #     ret = m.group('ret').strip()
-    #     cls_ptr = m.group('cls').strip()  # e.g. Bedrock::JSONObject::Node::*
-    #     rest = m.group('rest').strip()  # e.g. (bool) const
-    #     return f"{ret} ({cls_ptr}{name}){(' ' + rest) if rest and not rest.startswith('(') else rest}"
+    # Member function pointer:  RET (Class::*)(ARGS) [const/volatile]* [&|&&]?
+    m = re.match(
+        r"^(?P<ret>.+?)\s*\(\s*(?P<cls>.+?::\*)\s*\)\s*"
+        r"\((?P<args>[^)]*)\)\s*"
+        r"(?P<cv>(?:const|volatile)(?:\s+(?:const|volatile))*)?\s*"
+        r"(?P<ref>&{1,2})?\s*$",
+        t,
+    )
+    if m:
+        print(t)
+        ret = m.group("ret").strip()
+        cls = m.group("cls").strip()
+        args = m.group("args").strip()
+        cv = (m.group("cv") or "").strip()
+        ref = (m.group("ref") or "").strip()
+        tail = " ".join(x for x in (cv, ref) if x)
+        return f"{ret} ({cls}{name})({args}){(' ' + tail) if tail else ''}"
 
     # Fallback: just a normal "type name"
     return f"{t} {name}"
