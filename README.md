@@ -4,12 +4,11 @@
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)
 
-Generate C++ headers from DWARF Debugging Information Format (DWARF), targeting Minecraft: Bedrock Edition binaries.
+Generate C++ headers from DWARF Debugging Information Format (DWARF).
 
-> [!WARNING]
-> This tool requires binaries that include DWARF debug information in order to generate headers. Such binaries are not
-> publicly available for Minecraft: Bedrock Edition. You must first have access to debug-enabled binaries. This
-> tool cannot generate any useful output without them.
+> \[!WARNING]
+> This tool requires binaries that contain **DWARF debug information** in order to generate headers.
+> Please make sure that your input binary includes DWARF debug info, which is often not available publicly for proprietary software.
 
 ## Installation
 
@@ -58,8 +57,7 @@ Options:
   --help                  Show this message and exit.
 ```
 
-The `PATH` argument should point to a binary (e.g., `libminecraftpe.so` or `bedrock_server`) that contains DWARF debug
-information.
+The `PATH` argument should point to a binary that contains DWARF debug information.
 
 * `--base-dir` should point to the root directory used during compilation. This helps resolve relative include paths
   when reconstructing headers.
@@ -68,13 +66,13 @@ information.
 
 ## Examples
 
-### Extract from Android
+### Extract from `libminecraftpe.so`
 
 ```
 python -m dwarf2cpp path/to/libminecraftpe.so --base-dir D:/a/_work/1/s
 ```
 
-### Extract from Linux Server
+### Extract from `bedrock_server` (Linux)
 
 ```
 python -m dwarf2cpp path/to/bedrock_server --base-dir /mnt/vss/_work/1/s
@@ -84,7 +82,7 @@ python -m dwarf2cpp path/to/bedrock_server --base-dir /mnt/vss/_work/1/s
 
 Typical use cases include:
 
-* Analysing the internals of Minecraft: Bedrock Edition.
+* Analysing the internals of proprietary software.
 * Supporting the development of plugin frameworks such as **[Endstone](https://github.com/EndstoneMC/endstone)**.
 * Research on automated source reconstruction from DWARF.
 
@@ -93,7 +91,7 @@ Typical use cases include:
 * Generated headers may not always compile out-of-the-box. Manual fixes may be necessary.
 * Templates, inline functions, and macros cannot always be reconstructed faithfully.
 * Only works with binaries compiled with DWARF debug info. Stripped or release binaries will not work.
-* Tested mainly on Android (`libminecraftpe.so`) and Linux (`bedrock_server`) builds.
+* Only trivially tested. It may not work on any binary with DWARF debug info.
 
 ## Acknowledgements
 
