@@ -1,6 +1,6 @@
 # dwarf2cpp
 
-[![Build Status](https://github.com/endstone-insider/dwarf2cpp/actions/workflows/build.yml/badge.svg)](https://github.com/yourusername/dwarf2cpp/actions)
+[![Build Status](https://github.com/endstone-insider/dwarf2cpp/actions/workflows/build.yml/badge.svg)](https://github.com/endstone-insider/dwarf2cpp/actions)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)
 
