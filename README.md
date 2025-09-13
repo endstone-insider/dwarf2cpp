@@ -11,29 +11,16 @@ Generate C++ headers from DWARF Debugging Information Format (DWARF), targeting 
 > publicly available for Minecraft: Bedrock Edition. You must first have access to debug-enabled binaries. This
 > tool cannot generate any useful output without them.
 
----
-
 ## Installation
 
-dwarf2cpp is a standard Python package.
-
-### Requirements
-
-* **Python 3.9+**
-* **C++ Compiler**
-  Since dwarf2cpp uses a **pybind11 binding for LLVM's DWARF DebugInfo module**, you need a working C++ toolchain to
-  build it:
-
-    * On Windows: **MSVC (Visual Studio Build Tools)**
-    * On Linux: **GCC (g++)**
-    * On macOS: **Apple Clang (Xcode Command Line Tools)**
-* **CMake** (required to configure and build the native extension)
-* **LLVM with DWARF DebugInfo libraries** available (either pre-installed or fetched by the build process, depending on
-  your setup).
-
-Make sure your compiler and CMake are available on your system `PATH` before installation.
-
 ### Build from Sources
+
+Since dwarf2cpp uses **pybind11** to use LLVM's DWARF DebugInfo module from Python, you need a working C++ toolchain to
+build it:
+
+* On Windows: **MSVC (Visual Studio Build Tools)**
+* On Linux: **GCC (g++)**
+* On macOS: **Apple Clang (Xcode Command Line Tools)**
 
 ```
 git clone https://github.com/yourusername/dwarf2cpp.git
@@ -95,13 +82,10 @@ python -m dwarf2cpp path/to/bedrock_server --base-dir /mnt/vss/_work/1/s
 
 ## Motivation / Purpose
 
-Minecraft: Bedrock Edition does not provide public headers for its binaries, making modding more difficult.
-This project exists to bridge that gap by reconstructing usable C++ headers directly from DWARF debug information.
-
 Typical use cases include:
 
 * Analysing the internals of Minecraft: Bedrock Edition.
-* Supporting plugin frameworks such as **[Endstone](https://github.com/EndstoneMC/endstone)**.
+* Supporting the development of plugin frameworks such as **[Endstone](https://github.com/EndstoneMC/endstone)**.
 * Research on automated source reconstruction from DWARF.
 
 ## Limitations
@@ -131,11 +115,10 @@ This project makes use of the following open source technologies:
 
 ## Contributing
 
-Contributions are welcome! If you encounter issues or have suggestions for improvements, please open an issue or a pull
-request on GitHub.
-When contributing code, please ensure that your changes are well-documented and tested.
+Contributions are welcome!
+If you encounter issues or have suggestions for improvements, please open an issue or a pull request on GitHub.
 
 ## License
 
 This project is distributed under the MIT License.
-See the [LICENSE] file for more details.
+See the [LICENSE](LICENSE) file for more details.
