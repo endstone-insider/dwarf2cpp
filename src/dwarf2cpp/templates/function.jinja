@@ -8,7 +8,7 @@
 {%- for parameter in obj.parameters -%}
   {%- if parameter.name != "this" -%}
     {%- if parameter.kind.value == "positional" -%}
-      {{ parameter.type }}{{ " " ~ parameter.name if parameter.name }}
+      {{ parameter.type | insert_name(parameter.name) }}
     {%- elif parameter.kind.value == "variadic" -%}
       ...
     {%- endif -%}

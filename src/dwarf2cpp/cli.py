@@ -6,7 +6,7 @@ from jinja2 import Environment, FileSystemLoader
 from tqdm import tqdm
 
 from ._dwarf import DWARFContext
-from .filters import do_ns_actions, do_ns_chain
+from .filters import do_insert_name, do_ns_actions, do_ns_chain
 from .post_process import cleanup
 from .visitor import Visitor
 
@@ -34,6 +34,7 @@ def main(path: Path, base_dir: str, output_path: Path | None):
     env = Environment(loader=FileSystemLoader(template_dir), keep_trailing_newline=True)
     env.filters["ns_chain"] = do_ns_chain
     env.filters["ns_actions"] = do_ns_actions
+    env.filters["insert_name"] = do_insert_name
 
     for rel_path, file in (pbar := tqdm(visitor.files)):
         result = env.get_template("file.jinja").render(file=file)
