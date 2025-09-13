@@ -455,9 +455,22 @@ class Visitor:
                 case _:
                     raise ValueError(f"Unhandled child tag {child.tag}")
 
-        if die.linkage_name or die.short_name:
-            key = f"{die.linkage_name or die.short_name}@{len(function.parameters)}"
+        # sync parameter names from definition to declaration
+        key = None
+        if die.linkage_name:
+            # c++ functions with external linkage
+            key = f"{die.linkage_name}@{len(function.parameters)}"
+        elif die.find("DW_AT_external") and die.short_name:
+            # c functions with external linkage
+            key = f"{die.short_name}@{len(function.parameters)}"
+
+        if key:
             self._functions[key].append(function)
+            # if this is a definition of a class constructor, it has a DW_AT_specification pointing to the
+            # declaration with no DW_AT_linkage_name. Since we know the relationship, we can manually add the
+            # declaration to the function map
+            if spec and not spec.linkage_name:
+                self._functions[key].append(self._cache[spec.offset])
 
             if key not in self._param_names:
                 self._param_names[key] = [p.name for p in function.parameters]
