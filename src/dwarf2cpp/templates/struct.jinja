@@ -1,0 +1,17 @@
+{{ obj.kind }}{{ " " ~ obj.name if obj.name }}{{ " alignas({})".format(obj.alignment) if obj.alignment }}
+{%- for base, access in obj.bases -%}
+{{ " : " if loop.first }}{{ access.name.lower() ~ " " if access }}{{ base }}{{ ", " if not loop.last }}
+{%- endfor -%}
+{{ " {" }}
+{% for _, members in obj.members | dictsort -%}
+{%- filter indent(4, first=True) -%}
+  {%- for member in members -%}
+    {%- if not member.is_implicit -%}
+      {%- with obj = member -%}
+        {%- include "{}.jinja".format(obj.kind) with context -%} {{ "; " if not loop.last else ";\n" }}
+      {%- endwith -%}
+    {%- endif -%}
+  {%- endfor -%}
+{%- endfilter -%}
+{%- endfor -%}
+}

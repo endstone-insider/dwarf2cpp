@@ -1,0 +1,5 @@
+enum{{ " class" if obj.is_class }}{{ " " ~ obj.name if obj.name }}{{ " : " ~ obj.base if obj.base }} {
+{% for name, value in obj.values -%}
+  {{ "{} = {}{}".format(name, value, ",\n" if not loop.last else ",") | indent(4, first=True) }}
+{%- endfor %}
+}

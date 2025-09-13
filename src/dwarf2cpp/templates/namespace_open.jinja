@@ -1,0 +1,5 @@
+{% if ns.name -%}
+  {% if ns.is_inline %}inline namespace{% else %}namespace{% endif %} {{ ns.name }} {
+{%- else -%}
+  namespace {
+{%- endif %}

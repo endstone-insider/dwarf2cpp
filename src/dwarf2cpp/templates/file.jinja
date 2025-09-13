@@ -1,0 +1,19 @@
+{%- set st = namespace(prev=[]) -%}
+
+{%- for _, objs in file | dictsort -%}
+  {%- for obj in objs -%}
+    {%- if not obj.is_implicit -%}
+      {%- for action in st.prev | ns_actions(obj.parent | ns_chain) -%}
+        {%- set ns = action.namespace -%}
+        {%- include "namespace_%s.jinja" | format(action.kind) with context -%}
+      {%- endfor -%}
+      {%- include "%s.jinja" | format(obj.kind) with context -%} {{ "; " if not loop.last else ";\n" }}
+      {%- set st.prev = obj.parent | ns_chain -%}
+    {%- endif -%}
+  {%- endfor -%}
+{%- endfor -%}
+
+{%- for action in (st.prev | ns_actions([])) -%}
+  {%- set ns = action.namespace -%}
+  {%- include "namespace_" ~ action.kind ~ ".jinja" with context -%}
+{%- endfor -%}

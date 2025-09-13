@@ -1,0 +1,18 @@
+{{- "[[noreturn]] " if obj.noreturn -}}
+{{- "virtual " if obj.virtuality -}}
+{{- "explicit " if obj.is_explicit -}}
+{{- obj.returns | type_cleanup ~ " " if obj.returns -}}
+{{ obj.name }}(
+{%- for parameter in obj.parameters -%}
+  {%- if parameter.name != "this" -%}
+    {%- if parameter.kind.value == "positional" -%}
+      {{ parameter.type | type_cleanup }}{{ " " ~ parameter.name if parameter.name }}
+    {%- elif parameter.kind.value == "variadic" -%}
+      ...
+    {%- endif -%}
+  {%- if not loop.last -%}, {% endif -%}
+  {%- endif -%}
+{%- endfor -%}
+)
+{{- " = 0" if obj.virtuality and obj.virtuality.name == "PURE_VIRTUAL" -}}
+{{- " = delete" if obj.is_deleted -}}

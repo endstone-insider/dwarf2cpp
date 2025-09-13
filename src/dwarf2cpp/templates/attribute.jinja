@@ -1,0 +1,7 @@
+{%- set parts = obj.type.split('[', maxsplit=1) -%}
+{%- set type  = parts[0] -%}
+{%- set array = ('[{}'.format(parts[1]) if parts|length > 1 else '') -%}
+{{- "alignas({}) ".format(obj.alignment) if obj.alignment -}}
+{{ type | type_cleanup }} {{ obj.name }}{{ array }}
+{{- " : {}".format(obj.bit_size) if obj.bit_size is not none -}}
+{{- " = {}".format(obj.default_value) if obj.default_value is not none -}}

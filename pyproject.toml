@@ -1,0 +1,19 @@
+[project]
+name = "dwarf2cpp"
+version = "0.1.0"
+description = "Generate C++ headers from DWARF Debugging Information Format"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["lazy_loader"]
+
+[project.scripts]
+dwarf2cpp = "dwarf2cpp.cli:main"
+
+[build-system]
+requires = ["scikit-build-core-conan"]
+build-backend = "scikit_build_core_conan.build"
+
+
+[tool.ruff]
+line-length = 120
+lint.extend-select = ["I"]

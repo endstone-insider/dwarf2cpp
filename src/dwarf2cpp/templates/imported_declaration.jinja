@@ -1,0 +1,5 @@
+{%- if obj.name -%}
+  namespace {{ obj.name }} = {{ obj.import_.qualified_name }}
+{%- elif obj.import_ -%}
+  using {{ obj.import_ }}
+{%- endif -%}

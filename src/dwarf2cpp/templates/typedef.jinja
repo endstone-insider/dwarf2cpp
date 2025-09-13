@@ -1,0 +1,9 @@
+{%- set alignas = " alignas({})" | format(obj.alignment) if obj.alignment else "" -%}
+{%- if obj.value is none or obj.value is string -%}
+  using {{ obj.name }}{{ alignas }} = {{ obj.value | type_cleanup if obj.value else "void" }}
+{%- else -%}
+  {%- with obj = obj.value -%}
+    typedef {% include "{}.jinja".format(obj.kind) with context -%}
+  {%- endwith -%}
+  {{ " " ~ obj.name }}{{ alignas }}
+{%- endif -%}
