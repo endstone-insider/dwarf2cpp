@@ -10,15 +10,13 @@ jobs:
       fail-fast: false
       matrix:
         # macos-13 is an intel runner, macos-14 is apple silicon
-        os: [ ubuntu-latest, ubuntu-24.04-arm, windows-latest, windows-11-arm, macos-13, macos-14 ]
+        os: [ ubuntu-latest, windows-latest, macos-14 ]
 
     steps:
       - uses: actions/checkout@v5
 
       - name: Build wheels
         uses: pypa/cibuildwheel@v3.1.4
-        env:
-           CIBW_SOME_OPTION: value
 
       - uses: actions/upload-artifact@v4
         with:
