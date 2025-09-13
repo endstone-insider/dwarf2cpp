@@ -123,6 +123,14 @@ PYBIND11_MODULE(_dwarf, m) {
       .value("PURE_VIRTUAL", llvm::dwarf::DW_VIRTUALITY_pure_virtual)
       .finalize();
 
+  py::native_enum<llvm::dwarf::InlineAttribute>(m, "InlineAttribute",
+                                                "enum.IntEnum")
+      .value("NOT_INLINED", llvm::dwarf::DW_INL_not_inlined)
+      .value("INLINED", llvm::dwarf::DW_INL_inlined)
+      .value("DECLARED_NOT_INLINED", llvm::dwarf::DW_INL_declared_not_inlined)
+      .value("DECLARED_INLINED", llvm::dwarf::DW_INL_declared_inlined)
+      .finalize();
+
   py::class_<PyDWARFContext>(m, "DWARFContext")
       .def(py::init<const std::string &>(), py::arg("path"))
       .def_property_readonly("info_section_units",

@@ -10,6 +10,7 @@ from ._dwarf import (
     DWARFContext,
     DWARFDie,
     DWARFTypePrinter,
+    InlineAttribute,
     VirtualityAttribute,
 )
 from .models import (
@@ -32,12 +33,14 @@ logger = logging.getLogger("dwarf2cpp")
 
 
 def scoped_tags(tag: str) -> bool:
-    return tag in {"DW_TAG_structure_type",
-                   "DW_TAG_class_type",
-                   "DW_TAG_union_type",
-                   "DW_TAG_namespace",
-                   "DW_TAG_enumeration_type",
-                   "DW_TAG_typedef"}
+    return tag in {
+        "DW_TAG_structure_type",
+        "DW_TAG_class_type",
+        "DW_TAG_union_type",
+        "DW_TAG_namespace",
+        "DW_TAG_enumeration_type",
+        "DW_TAG_typedef",
+    }
 
 
 @functools.cache
@@ -384,7 +387,10 @@ class Visitor:
 
             match attribute.name:
                 case "DW_AT_inline":
-                    pass
+                    function.is_inline = InlineAttribute(attribute.value.as_constant()) in {
+                        InlineAttribute.DECLARED_NOT_INLINED,
+                        InlineAttribute.DECLARED_INLINED,
+                    }
                 case "DW_AT_noreturn":
                     function.noreturn = True
                 case "DW_AT_explicit":
@@ -439,10 +445,10 @@ class Visitor:
                     parameter = Parameter(name="", type="", kind=ParameterKind.VARIADIC)
                     function.parameters.append(parameter)
                 case (
-                "DW_TAG_template_type_parameter"
-                | "DW_TAG_template_value_parameter"
-                | "DW_TAG_GNU_template_parameter_pack"
-                | "DW_TAG_GNU_template_template_param"
+                    "DW_TAG_template_type_parameter"
+                    | "DW_TAG_template_value_parameter"
+                    | "DW_TAG_GNU_template_parameter_pack"
+                    | "DW_TAG_GNU_template_template_param"
                 ):
                     # TODO: handle template params
                     pass
@@ -649,10 +655,10 @@ class Visitor:
 
             match child.tag:
                 case (
-                "DW_TAG_template_type_parameter"
-                | "DW_TAG_template_value_parameter"
-                | "DW_TAG_GNU_template_parameter_pack"
-                | "DW_TAG_GNU_template_template_param"
+                    "DW_TAG_template_type_parameter"
+                    | "DW_TAG_template_value_parameter"
+                    | "DW_TAG_GNU_template_parameter_pack"
+                    | "DW_TAG_GNU_template_template_param"
                 ):
                     # TODO: handle template params
                     pass

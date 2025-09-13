@@ -73,6 +73,7 @@ class Function(Object):
     noreturn: bool = False
     is_explicit: bool = False
     is_deleted: bool = False
+    is_inline: bool = False
     virtuality: VirtualityAttribute | None = None
 
 

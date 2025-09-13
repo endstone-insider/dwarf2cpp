@@ -20,7 +20,7 @@ logger = logging.getLogger("dwarf2cpp")
     "-o",
     type=click.Path(path_type=Path),
     default=None,
-    help="Output directory for generated files. Defaults to 'out' inside the input file's directory."
+    help="Output directory for generated files. Defaults to 'out' inside the input file's directory.",
 )
 def main(path: Path, base_dir: str, output_path: Path | None):
     output_path = output_path or (path.parent / "out")
