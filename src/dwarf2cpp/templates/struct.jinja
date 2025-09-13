@@ -13,14 +13,13 @@
         {%- set ns.access = members[0].access -%}
     {%- endif -%}
   {%- endif -%}
-  {%- filter indent(4, first=True) -%}
-    {%- for member in members -%}
-      {%- if not member.is_implicit -%}
-        {%- with obj = member -%}
-          {%- include "{}.jinja".format(obj.kind) with context -%} {{ "; " if not loop.last else ";\n" }}
-        {%- endwith -%}
-      {%- endif -%}
-    {%- endfor -%}
-  {%- endfilter -%}
+  {%- set content -%}
+  {%- for member in members if not member.is_implicit -%}
+    {%- with obj = member -%}
+      {%- include "{}.jinja".format(obj.kind) with context -%}{{ "; " if not loop.last else ";\n" }}
+    {%- endwith -%}
+  {%- endfor -%}
+  {%- endset -%}
+  {{ content | indent(4, first=True) if content }}
 {%- endfor -%}
 }

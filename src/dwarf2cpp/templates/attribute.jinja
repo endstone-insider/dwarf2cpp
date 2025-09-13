@@ -1,4 +1,11 @@
 {{- "alignas({}) ".format(obj.alignment) if obj.alignment -}}
-{{ obj.type | insert_name(obj.name) }}
+{%- if obj.type is string -%}
+  {{ obj.type | insert_name(obj.name) }}
+{%- else -%}
+  {%- with obj = obj.type -%}
+    {%- include "{}.jinja".format(obj.kind) with context -%}
+  {%- endwith -%}
+  {{ " " ~ obj.name }}
+{%- endif -%}
 {{- " : {}".format(obj.bit_size) if obj.bit_size is not none -}}
 {{- " = {}".format(obj.default_value) if obj.default_value is not none -}}

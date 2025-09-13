@@ -577,6 +577,23 @@ class Visitor:
             return
 
         variable = Attribute(name=die.short_name)
+        ty = die.find("DW_AT_type")
+        ty = ty.as_referenced_die()
+        if ty.short_name is None and ty.tag in {
+            "DW_TAG_class_type",
+            "DW_TAG_union_type",
+            "DW_TAG_enumeration_type",
+            "DW_TAG_structure_type",
+        }:
+            # this is an in-place declaration
+            self.visit(ty)
+            value = self._cache[ty.offset]
+            value.is_implicit = True
+            variable.type = value
+        else:
+            variable.type = get_qualified_type(ty)
+
+        assert variable.type, "Expected type"
 
         for attribute in die.attributes:
             if attribute.name in {
@@ -590,12 +607,11 @@ class Visitor:
                 "DW_AT_byte_size",
                 "DW_AT_bit_offset",
                 "DW_AT_specification",
+                "DW_AT_type",
             }:
                 continue
 
             match attribute.name:
-                case "DW_AT_type":
-                    variable.type = get_qualified_type(attribute.value.as_referenced_die())
                 case "DW_AT_const_value":
                     variable.default_value = attribute.value.as_constant()
                 case "DW_AT_alignment":
