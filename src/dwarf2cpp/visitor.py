@@ -532,11 +532,16 @@ class Visitor:
 
         import_die = die.find("DW_AT_import").as_referenced_die()
         self.visit(import_die)
+        if import_die.offset not in self._cache:
+            return
+
         if import_die.tag == "DW_TAG_namespace":
             import_ = self._cache[import_die.offset]
             imported_decl = ImportedDeclaration(name=die.short_name, import_=import_)
         else:
             imported_decl = ImportedDeclaration(name="", import_=get_qualified_type(import_die))
+
+        assert imported_decl.import_ is not None, "Expected valid import."
 
         for attribute in die.attributes:
             if attribute.name in {

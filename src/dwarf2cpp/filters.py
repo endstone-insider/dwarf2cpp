@@ -61,7 +61,6 @@ def do_insert_name(tp: str, name: str):
         t,
     )
     if m:
-        print(t)
         ret = m.group("ret").strip()
         cls = m.group("cls").strip()
         args = m.group("args").strip()
