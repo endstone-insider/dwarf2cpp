@@ -9,7 +9,7 @@ from ._dwarf import AccessAttribute, VirtualityAttribute
 @dataclass
 class Object:
     name: str
-    parent: "Namespace | None" = None
+    parent: "Namespace | None" = field(default=None, compare=False)
     is_implicit: bool = False
     access: AccessAttribute | None = None
 

@@ -695,6 +695,7 @@ class Visitor:
                     continue
 
                 member = self._cache[child.offset]
+                member.parent = struct
                 lines.append(member)
                 if isinstance(member, Function):
                     # constructors, destructors and operators should have no return type
