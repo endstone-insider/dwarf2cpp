@@ -1,5 +1,3 @@
-
-#include <format>
 #include <llvm/ADT/StringSwitch.h>
 #include <llvm/DebugInfo/DWARF/DWARFContext.h>
 #include <llvm/DebugInfo/DWARF/DWARFTypePrinter.h>
