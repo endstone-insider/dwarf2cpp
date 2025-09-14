@@ -51,6 +51,7 @@ class Attribute(Object):
     alignment: int | None = None
     bit_size: int | None = None
     is_template: bool = False
+    is_static: bool = False
 
 
 class ParameterKind(enum.StrEnum):

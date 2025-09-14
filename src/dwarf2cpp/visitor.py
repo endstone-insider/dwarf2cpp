@@ -332,6 +332,10 @@ class Visitor:
     def visit_member(self, die: DWARFDie) -> None:
         self._handle_attribute(die)
 
+        member = self._cache.get(die.offset)
+        if member and die.find("DW_AT_external"):
+            member.is_static = True
+
     def visit_subprogram(self, die: DWARFDie) -> None:
         if not die.find("DW_AT_decl_file") or not die.find("DW_AT_decl_line") or not die.short_name:
             return
