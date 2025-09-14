@@ -13,6 +13,9 @@ dwarf2cpp = "dwarf2cpp.cli:main"
 requires = ["scikit-build-core-conan"]
 build-backend = "scikit_build_core_conan.build"
 
+[tool.scikit-build]
+wheel.exclude = ["src/dwarf2cpp/_dwarf.cpp"]
+
 [[tool.scikit-build-core-conan.overrides]]
 if.platform-system = "win32"
 settings = ["compiler.cppstd=17", "compiler.version=193"]
