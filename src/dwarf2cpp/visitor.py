@@ -55,6 +55,20 @@ def get_qualified_type(die: DWARFDie):
     return str(printer)
 
 
+def float_to_str(value: float) -> str:
+    s = f"{value:.7f}".rstrip("0")
+    if s[-1] == ".":
+        s += "0"
+    return s
+
+
+def double_to_str(value: float) -> str:
+    s = f"{value:.16f}".rstrip("0")
+    if s[-1] == ".":
+        s += "0"
+    return s
+
+
 class Visitor:
     """
     Visitor iterators on compile units to extract data from them.
@@ -78,11 +92,11 @@ class Visitor:
             List of files
         """
         for i, cu in (
-            pbar := tqdm(
-                enumerate(self.context.compile_units),
-                total=self.context.num_compile_units,
-                bar_format="[{n_fmt}/{total_fmt}] {desc}",
-            )
+                pbar := tqdm(
+                    enumerate(self.context.compile_units),
+                    total=self.context.num_compile_units,
+                    bar_format="[{n_fmt}/{total_fmt}] {desc}",
+                )
         ):
             cu_die = cu.unit_die
             name = cu_die.short_name
@@ -469,10 +483,10 @@ class Visitor:
                     parameter = Parameter(name="", type="", kind=ParameterKind.VARIADIC)
                     function.parameters.append(parameter)
                 case (
-                    "DW_TAG_template_type_parameter"
-                    | "DW_TAG_template_value_parameter"
-                    | "DW_TAG_GNU_template_parameter_pack"
-                    | "DW_TAG_GNU_template_template_param"
+                "DW_TAG_template_type_parameter"
+                | "DW_TAG_template_value_parameter"
+                | "DW_TAG_GNU_template_parameter_pack"
+                | "DW_TAG_GNU_template_template_param"
                 ):
                     # TODO: handle template params
                     pass
@@ -644,7 +658,9 @@ class Visitor:
         if variable.default_value is not None:
             int_value = variable.default_value
             if "float" in variable.type:
-                variable.default_value = struct.unpack("f", struct.pack("I", int_value))[0]
+                variable.default_value = float_to_str(struct.unpack("f", struct.pack("I", int_value))[0])
+            elif "double" in variable.type:
+                variable.default_value = double_to_str(struct.unpack("d", struct.pack("Q", int_value))[0])
 
         self._cache[die.offset] = variable
 
@@ -714,10 +730,10 @@ class Visitor:
 
             match child.tag:
                 case (
-                    "DW_TAG_template_type_parameter"
-                    | "DW_TAG_template_value_parameter"
-                    | "DW_TAG_GNU_template_parameter_pack"
-                    | "DW_TAG_GNU_template_template_param"
+                "DW_TAG_template_type_parameter"
+                | "DW_TAG_template_value_parameter"
+                | "DW_TAG_GNU_template_parameter_pack"
+                | "DW_TAG_GNU_template_template_param"
                 ):
                     # TODO: handle template params
                     pass
