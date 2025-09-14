@@ -100,6 +100,12 @@ public:
   auto appendUnqualifiedName(llvm::DWARFDie die) {
     printer.appendUnqualifiedName(die);
   }
+  auto appendUnqualifiedNameBefore(llvm::DWARFDie die) {
+    return printer.appendUnqualifiedNameBefore(die);
+  }
+  auto appendUnqualifiedNameAfter(llvm::DWARFDie die, llvm::DWARFDie inner) {
+    printer.appendUnqualifiedNameAfter(die, inner);
+  }
   auto appendScopes(llvm::DWARFDie die) { printer.appendScopes(die); }
 
 private:
@@ -286,6 +292,10 @@ PYBIND11_MODULE(_dwarf, m) {
       .def("append_qualified_name", &PyDWARFTypePrinter::appendQualifiedName)
       .def("append_unqualified_name",
            &PyDWARFTypePrinter::appendUnqualifiedName)
+      .def("append_unqualified_name_before",
+           &PyDWARFTypePrinter::appendUnqualifiedNameBefore)
+      .def("append_unqualified_name_after",
+           &PyDWARFTypePrinter::appendUnqualifiedNameAfter)
       .def("append_scopes", &PyDWARFTypePrinter::appendScopes)
       .def("__str__", &PyDWARFTypePrinter::string);
 }

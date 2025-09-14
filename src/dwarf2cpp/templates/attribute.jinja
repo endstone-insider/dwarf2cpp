@@ -1,6 +1,6 @@
 {{- "static " if obj.is_static -}}
 {{- "alignas({}) ".format(obj.alignment) if obj.alignment -}}
-{%- if obj.type is string -%}
+{%- if obj.type is string or obj.type is sequence -%}
   {{ obj.type | insert_name(obj.name) }}
 {%- else -%}
   {%- with obj = obj.type -%}

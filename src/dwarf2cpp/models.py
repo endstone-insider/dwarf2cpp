@@ -46,7 +46,7 @@ class ImportedDeclaration(Object):
 class Attribute(Object):
     kind: ClassVar[str] = "attribute"
     # attributes
-    type: str | None = None
+    type: str | tuple[str, str] | None = None
     default_value: int | float | None = None
     alignment: int | None = None
     bit_size: int | None = None
@@ -62,7 +62,7 @@ class ParameterKind(enum.StrEnum):
 @dataclass
 class Parameter:
     name: str
-    type: str | None = None
+    type: str | tuple[str, str] | None = None
     kind: ParameterKind | None = None
 
 

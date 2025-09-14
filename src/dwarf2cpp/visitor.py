@@ -46,13 +46,26 @@ def scoped_tags(tag: str) -> bool:
 
 
 @functools.cache
-def get_qualified_type(die: DWARFDie):
+def get_qualified_type(die: DWARFDie, split=False) -> str | tuple[str, str]:
     printer = DWARFTypePrinter()
     if scoped_tags(die.tag):
         printer.append_scopes(die.parent)
 
-    printer.append_unqualified_name(die)
-    return str(printer)
+    if not split:
+        printer.append_unqualified_name(die)
+        return str(printer).strip()
+
+    inner = printer.append_unqualified_name_before(die)
+    before = str(printer).strip()
+
+    printer = DWARFTypePrinter()
+    printer.append_unqualified_name_after(die, inner)
+    after = str(printer).strip()
+
+    if not after:
+        return before
+
+    return before, after
 
 
 def float_to_str(value: float) -> str:
@@ -92,11 +105,11 @@ class Visitor:
             List of files
         """
         for i, cu in (
-                pbar := tqdm(
-                    enumerate(self.context.compile_units),
-                    total=self.context.num_compile_units,
-                    bar_format="[{n_fmt}/{total_fmt}] {desc}",
-                )
+            pbar := tqdm(
+                enumerate(self.context.compile_units),
+                total=self.context.num_compile_units,
+                bar_format="[{n_fmt}/{total_fmt}] {desc}",
+            )
         ):
             cu_die = cu.unit_die
             name = cu_die.short_name
@@ -475,7 +488,7 @@ class Visitor:
 
                     parameter = Parameter(
                         name=child.short_name,
-                        type=get_qualified_type(child.find("DW_AT_type").as_referenced_die()),
+                        type=get_qualified_type(child.find("DW_AT_type").as_referenced_die(), split=True),
                         kind=ParameterKind.POSITIONAL,
                     )
                     function.parameters.append(parameter)
@@ -483,10 +496,10 @@ class Visitor:
                     parameter = Parameter(name="", type="", kind=ParameterKind.VARIADIC)
                     function.parameters.append(parameter)
                 case (
-                "DW_TAG_template_type_parameter"
-                | "DW_TAG_template_value_parameter"
-                | "DW_TAG_GNU_template_parameter_pack"
-                | "DW_TAG_GNU_template_template_param"
+                    "DW_TAG_template_type_parameter"
+                    | "DW_TAG_template_value_parameter"
+                    | "DW_TAG_GNU_template_parameter_pack"
+                    | "DW_TAG_GNU_template_template_param"
                 ):
                     # TODO: handle template params
                     pass
@@ -609,7 +622,7 @@ class Visitor:
             value.is_implicit = True
             variable.type = value
         else:
-            variable.type = get_qualified_type(ty)
+            variable.type = get_qualified_type(ty, split=True)
 
         assert variable.type, "Expected type"
 
@@ -730,10 +743,10 @@ class Visitor:
 
             match child.tag:
                 case (
-                "DW_TAG_template_type_parameter"
-                | "DW_TAG_template_value_parameter"
-                | "DW_TAG_GNU_template_parameter_pack"
-                | "DW_TAG_GNU_template_template_param"
+                    "DW_TAG_template_type_parameter"
+                    | "DW_TAG_template_value_parameter"
+                    | "DW_TAG_GNU_template_parameter_pack"
+                    | "DW_TAG_GNU_template_template_param"
                 ):
                     # TODO: handle template params
                     pass
