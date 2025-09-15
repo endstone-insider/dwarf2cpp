@@ -6,6 +6,7 @@
       {%- set ns = action.namespace -%}
       {%- include "namespace_%s.jinja" | format(action.kind) with context -%}
     {%- endfor -%}
+    {{- "\n" if (obj.template or obj.kind == "template") and not loop.first -}}
     {%- include "%s.jinja" | format(obj.kind) with context -%}{{ "; " if not loop.last else ";\n" }}
     {%- set st.prev = obj.parent | ns_chain -%}
   {%- endfor -%}

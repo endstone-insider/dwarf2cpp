@@ -13,7 +13,9 @@ class Object:
     name: str
     parent: "Namespace | None" = field(default=None, compare=False)
     is_implicit: bool = False
+    is_declaration: bool = False
     access: AccessAttribute | None = None
+    template: "Template | None" = field(default=None, compare=False)
 
     def merge(self, other: "Object") -> bool:
         return False
@@ -184,3 +186,24 @@ class TypeDef(Object):
     # attributes
     value: str | Struct | Class | Union | Enum | None = None
     alignment: int | None = None
+
+
+class TemplateParameterKind(enum.StrEnum):
+    CONSTANT = "constant"
+    TYPE = "type"
+    TEMPLATE = "template"
+    PACK = "pack"
+
+
+@dataclass
+class TemplateParameter:
+    name: str
+    kind: TemplateParameterKind
+    value_type: str | None = None
+
+
+@dataclass
+class Template(Object):
+    kind: ClassVar[str] = "template"
+    declaration: Struct | Function | Attribute | None = None
+    parameters: list[TemplateParameter] = field(default_factory=list)

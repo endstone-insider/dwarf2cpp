@@ -1,3 +1,4 @@
+import copy
 import functools
 import logging
 import posixpath
@@ -27,6 +28,9 @@ from .models import (
     Parameter,
     ParameterKind,
     Struct,
+    Template,
+    TemplateParameter,
+    TemplateParameterKind,
     TypeDef,
     Union,
 )
@@ -186,6 +190,8 @@ class Visitor:
 
                 self.visit(child)
                 if child.offset in self._cache:
+                    if template := self._cache[child.offset].template:
+                        self._add(decl_file, decl_line, template)
                     self._add(decl_file, decl_line, self._cache[child.offset])
 
             elif child.tag in {
@@ -257,6 +263,10 @@ class Visitor:
                     member = self._cache[child.offset]
                     assert member.parent is None, "Already has a parent"
                     member.parent = namespace
+                    if template := member.template:
+                        template.parent = namespace
+                        self._add(decl_file, decl_line, template)
+
                     self._add(decl_file, decl_line, member)
             else:
                 raise ValueError(f"Unhandled child tag {child.tag}")
@@ -584,6 +594,19 @@ class Visitor:
 
         self._cache[die.offset] = imported_decl
 
+    def visit_template_type_parameter(self, die: DWARFDie) -> None:
+        self._cache[die.offset] = TemplateParameter(die.short_name, TemplateParameterKind.TYPE)
+
+    def visit_template_value_parameter(self, die: DWARFDie) -> None:
+        ty = get_qualified_type(die.find("DW_AT_type").as_referenced_die())
+        self._cache[die.offset] = TemplateParameter(die.short_name, TemplateParameterKind.CONSTANT, value_type=ty)
+
+    def visit_GNU_template_parameter_pack(self, die: DWARFDie) -> None:
+        self._cache[die.offset] = TemplateParameter(die.short_name, TemplateParameterKind.PACK)
+
+    def visit_GNU_template_template_param(self, die: DWARFDie) -> None:
+        self._cache[die.offset] = TemplateParameter(die.short_name, TemplateParameterKind.TEMPLATE)
+
     def generic_visit(self, die: DWARFDie) -> None:
         for child in die.children:
             self.visit(child)
@@ -592,7 +615,7 @@ class Visitor:
         file = self._files[filepath]
         lines = file[lineno]
 
-        if len(lines) > 4:
+        if len(lines) >= 8:
             # too many items on a single line (template instantiations?)
             return
 
@@ -665,15 +688,27 @@ class Visitor:
                     print(die.dump())
                     raise ValueError(f"Unhandled attribute {attribute.name}")
 
+        template_params = []
         for child in die.children:
             if child.tag in {
                 "DW_TAG_template_type_parameter",
                 "DW_TAG_template_value_parameter",
                 "DW_TAG_GNU_template_parameter_pack",
             }:
-                pass
+                template_params.append(child)
             else:
                 raise ValueError(f"Unhandled child tag {child.tag}")
+
+        if template_params:
+            declaration = copy.copy(variable)
+            assert isinstance(declaration.type, tuple)
+            declaration.type = (declaration.type[0].split("<", maxsplit=1)[0], declaration.type[1])
+            declaration.default_value = None
+            declaration.is_declaration = True
+            variable.template = Template(name="", declaration=declaration)
+            for template_param in template_params:
+                self.visit(template_param)
+                variable.template.parameters.append(self._cache[template_param.offset])
 
         self._cache[die.offset] = variable
 
