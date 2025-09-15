@@ -142,7 +142,7 @@ class Visitor:
                     if not result:
                         # First item, just add it
                         result.append(item)
-                    elif not item in result:
+                    elif item not in result:
                         last = result[-1]
                         if not last.merge(item):
                             # merge() returned False, so append new item

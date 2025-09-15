@@ -8,16 +8,15 @@ from ._dwarf import AccessAttribute, VirtualityAttribute
 
 @dataclass
 class Object:
+    kind: ClassVar[str]
+
     name: str
     parent: "Namespace | None" = field(default=None, compare=False)
     is_implicit: bool = False
     access: AccessAttribute | None = None
 
     def merge(self, other: "Object") -> bool:
-        if self != other:
-            return False
-
-        return True
+        return False
 
 
 @dataclass
@@ -68,15 +67,9 @@ class Attribute(Object):
         if self.default_value is None:
             self.default_value = other.default_value
 
-        if self.alignment is None:
-            self.alignment = other.alignment
-
-        if self.bit_size is None:
-            self.bit_size = other.bit_size
-
-        if self.is_static is None:
-            self.is_static = other.is_static
-
+        self.alignment = self.alignment or other.alignment
+        self.bit_size = self.bit_size or other.bit_size
+        self.is_static = self.is_static or other.is_static
         return True
 
 
@@ -106,6 +99,29 @@ class Function(Object):
     is_const: bool = False
     virtuality: VirtualityAttribute | None = None
 
+    def merge(self, other: "Function") -> bool:
+        if not isinstance(other, Function):
+            return False
+
+        if self.name != other.name or self.returns != other.returns or len(self.parameters) != len(other.parameters):
+            return False
+
+        for p1, p2 in zip(self.parameters, other.parameters):
+            if p1.type != p2.type or p1.kind != p2.kind:
+                return False
+
+        for p1, p2 in zip(self.parameters, other.parameters):
+            p1.name = p1.name or p2.name
+
+        self.noreturn = self.noreturn or other.noreturn
+        self.is_explicit = self.is_explicit or other.is_explicit
+        self.is_deleted = self.is_deleted or other.is_deleted
+        self.is_inline = self.is_inline or other.is_inline
+        self.is_static = self.is_static or other.is_static
+        self.is_const = self.is_const or other.is_const
+        self.virtuality = self.virtuality or other.virtuality
+        return True
+
 
 @dataclass
 class Struct(Object):
@@ -114,6 +130,33 @@ class Struct(Object):
     bases: list[tuple[str, AccessAttribute | None]] = field(default_factory=list)
     members: dict[int, list[Object]] = field(default_factory=lambda: defaultdict(list))
     alignment: int | None = None
+
+    def merge(self, other: "Struct") -> bool:
+        if not isinstance(other, Struct):
+            return False
+
+        if self.kind != other.kind or self.name != other.name or self.bases != other.bases:
+            return False
+
+        for lineno, objects in other.members.items():
+            members = self.members[lineno]
+            members.extend(objects)
+
+            result = []
+            for item in members:
+                if not result:
+                    # First item, just add it
+                    result.append(item)
+                elif item not in result:
+                    last = result[-1]
+                    if not last.merge(item):
+                        # merge() returned False, so append new item
+                        result.append(item)
+
+            self.members[lineno] = result
+
+        self.alignment = self.alignment or other.alignment
+        return True
 
 
 @dataclass
