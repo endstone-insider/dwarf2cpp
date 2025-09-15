@@ -91,7 +91,7 @@ Typical use cases include:
 
 * Generated headers may not compile out-of-the-box. Manual adjustments may be required.
 * Templates, inline functions, and macros cannot always be reconstructed accurately.
-* Only works with binaries compiled with DWARF debug info. Stripped or release binaries will not work.
+* Only works with binaries compiled with DWARF debug info. Stripped binaries will not work.
 * Only trivially tested. It may fail with certain binaries.
 
 ## Acknowledgements
