@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Generate C++ headers from DWARF Debugging Information Format"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["lazy_loader", "tqdm"]
+dependencies = ["click", "jinja2", "lazy_loader", "tqdm"]
 
 [project.scripts]
 dwarf2cpp = "dwarf2cpp.cli:main"
