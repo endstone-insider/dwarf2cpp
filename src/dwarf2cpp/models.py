@@ -13,6 +13,12 @@ class Object:
     is_implicit: bool = False
     access: AccessAttribute | None = None
 
+    def merge(self, other: "Object") -> bool:
+        if self != other:
+            return False
+
+        return True
+
 
 @dataclass
 class Namespace:
@@ -50,8 +56,28 @@ class Attribute(Object):
     default_value: int | float | None = None
     alignment: int | None = None
     bit_size: int | None = None
-    is_template: bool = False
     is_static: bool = False
+
+    def merge(self, other: "Object") -> bool:
+        if not isinstance(other, Attribute):
+            return False
+
+        if self.name != other.name or self.type != other.type:
+            return False
+
+        if self.default_value is None:
+            self.default_value = other.default_value
+
+        if self.alignment is None:
+            self.alignment = other.alignment
+
+        if self.bit_size is None:
+            self.bit_size = other.bit_size
+
+        if self.is_static is None:
+            self.is_static = other.is_static
+
+        return True
 
 
 class ParameterKind(enum.StrEnum):

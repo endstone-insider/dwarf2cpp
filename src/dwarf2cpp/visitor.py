@@ -136,15 +136,19 @@ class Visitor:
                 continue
 
             for line, objects in file.items():
-                # ensure the uniqueness of elements
-                if len(objects) > 1:
-                    seen = []
-                    for obj in objects:
-                        if obj not in seen:
-                            seen.append(obj)
-                    objects = seen
+                result = []
 
-                file[line] = objects
+                for item in objects:
+                    if not result:
+                        # First item, just add it
+                        result.append(item)
+                    elif not item in result:
+                        last = result[-1]
+                        if not last.merge(item):
+                            # merge() returned False, so append new item
+                            result.append(item)
+
+                file[line] = result
 
             yield rel_path, file
 
@@ -662,8 +666,7 @@ class Visitor:
                 "DW_TAG_template_value_parameter",
                 "DW_TAG_GNU_template_parameter_pack",
             }:
-                variable.is_template = True
-                variable.default_value = None
+                pass
             else:
                 raise ValueError(f"Unhandled child tag {child.tag}")
 
