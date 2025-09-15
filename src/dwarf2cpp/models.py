@@ -205,5 +205,5 @@ class TemplateParameter:
 @dataclass
 class Template(Object):
     kind: ClassVar[str] = "template"
-    declaration: Struct | Function | Attribute | None = None
+    declaration: Struct | Attribute | None = None
     parameters: list[TemplateParameter] = field(default_factory=list)

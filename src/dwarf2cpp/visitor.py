@@ -265,7 +265,8 @@ class Visitor:
                     member.parent = namespace
                     if template := member.template:
                         template.parent = namespace
-                        self._add(decl_file, decl_line, template)
+                        if template not in self._files[decl_file][decl_line]:
+                            self._add(decl_file, decl_line, template)
 
                     self._add(decl_file, decl_line, member)
             else:
@@ -473,6 +474,7 @@ class Visitor:
                 case _:
                     raise ValueError(f"Unhandled attribute {attribute.name}")
 
+        template_params = []
         for child in die.children:
             if child.tag in {
                 "DW_TAG_label",
@@ -491,6 +493,15 @@ class Visitor:
                 # TODO: handle local variables, types and functions
                 continue
 
+            if child.tag in {
+                "DW_TAG_template_type_parameter",
+                "DW_TAG_template_value_parameter",
+                "DW_TAG_GNU_template_parameter_pack",
+                "DW_TAG_GNU_template_template_param",
+            }:
+                template_params.append(child)
+                continue
+
             match child.tag:
                 case "DW_TAG_formal_parameter":
                     if child.find("DW_AT_artificial"):
@@ -505,14 +516,6 @@ class Visitor:
                 case "DW_TAG_unspecified_parameters":
                     parameter = Parameter(name="", type="", kind=ParameterKind.VARIADIC)
                     function.parameters.append(parameter)
-                case (
-                    "DW_TAG_template_type_parameter"
-                    | "DW_TAG_template_value_parameter"
-                    | "DW_TAG_GNU_template_parameter_pack"
-                    | "DW_TAG_GNU_template_template_param"
-                ):
-                    # TODO: handle template params
-                    pass
                 case _:
                     raise ValueError(f"Unhandled child tag {child.tag}")
 
@@ -541,6 +544,12 @@ class Visitor:
                 for i, param in enumerate(function.parameters):
                     if param_names[i] is None and param.name is not None:
                         param_names[i] = param.name
+
+        # if template_params:
+        #     function.template = Template(name="")
+        #     for template_param in template_params:
+        #         self.visit(template_param)
+        #         function.template.parameters.append(self._cache[template_param.offset])
 
         self._cache[die.offset] = function
 
@@ -705,6 +714,7 @@ class Visitor:
             declaration.type = (declaration.type[0].split("<", maxsplit=1)[0], declaration.type[1])
             declaration.default_value = None
             declaration.is_declaration = True
+
             variable.template = Template(name="", declaration=declaration)
             for template_param in template_params:
                 self.visit(template_param)
@@ -740,6 +750,7 @@ class Visitor:
 
         self._cache[die.offset] = struct
 
+        template_params = []
         for child in die.children:
             if child.tag in {
                 "DW_TAG_typedef",
@@ -772,6 +783,14 @@ class Visitor:
                 if member.access is None:
                     member.access = access
 
+                if template := member.template:
+                    template.parent = struct
+                    if template.access is None:
+                        template.access = access
+
+                    if template not in lines:
+                        lines.append(template)
+
                 lines.append(member)
 
                 if isinstance(member, Function):
@@ -785,15 +804,16 @@ class Visitor:
 
                 continue
 
+            if child.tag in {
+                "DW_TAG_template_type_parameter",
+                "DW_TAG_template_value_parameter",
+                "DW_TAG_GNU_template_parameter_pack",
+                "DW_TAG_GNU_template_template_param",
+            }:
+                template_params.append(child)
+                continue
+
             match child.tag:
-                case (
-                    "DW_TAG_template_type_parameter"
-                    | "DW_TAG_template_value_parameter"
-                    | "DW_TAG_GNU_template_parameter_pack"
-                    | "DW_TAG_GNU_template_template_param"
-                ):
-                    # TODO: handle template params
-                    pass
                 case "DW_TAG_inheritance":
                     inherit_access = None
                     base = get_qualified_type(child.find("DW_AT_type").as_referenced_die())
@@ -818,3 +838,16 @@ class Visitor:
 
                 case _:
                     raise ValueError(f"Unhandled child tag {child.tag}")
+
+        if template_params:
+            declaration = copy.copy(struct)
+            declaration.name = declaration.name.split("<", maxsplit=1)[0]
+            declaration.bases = []
+            declaration.members = {}
+            declaration.alignment = None
+            declaration.is_declaration = True
+
+            struct.template = Template(name="", declaration=declaration)
+            for template_param in template_params:
+                self.visit(template_param)
+                struct.template.parameters.append(self._cache[template_param.offset])

@@ -1,17 +1,20 @@
+{{- "// " if not obj.declaration -}}
 template<
 {%- for parameter in obj.parameters -%}
   {%- if parameter.kind == "type" -%}
-    typename {{ parameter.name }}
+    typename{{ " " ~ parameter.name if parameter.name }}
   {%- elif parameter.kind == "constant" -%}
-    {{ parameter.value_type }} {{ parameter.name }}
+    {{ parameter.value_type }}{{ " " ~ parameter.name if parameter.name }}
   {%- elif parameter.kind == "pack" -%}
-    typename... {{ parameter.name }}
+    typename...{{ " " ~ parameter.name if parameter.name }}
   {%- elif parameter.kind == "template" -%}
-    template<typename> class {{ parameter.name }}
+    template<typename> class{{ " " ~ parameter.name if parameter.name }}
   {%- endif -%}
   {%- if not loop.last -%}, {% endif -%}
 {%- endfor -%}
 >
-{% with obj = obj.declaration -%}
+{% if obj.declaration -%}
+{%- with obj = obj.declaration -%}
   {%- include "{}.jinja".format(obj.kind) with context -%}
 {%- endwith -%}
+{%- endif -%}

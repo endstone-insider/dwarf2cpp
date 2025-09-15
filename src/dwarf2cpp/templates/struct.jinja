@@ -1,6 +1,8 @@
 {%- set ns = namespace(access='private' if obj.kind == "class" else 'public') -%}
 
+{{- "template<>\n" if obj.template -}}
 {{ obj.kind }}{{ " " ~ obj.name if obj.name }}{{ " alignas({})".format(obj.alignment) if obj.alignment }}
+{%- if not obj.is_declaration -%}
 {%- for base, access in obj.bases -%}
 {{ " : " if loop.first }}{{ access.name.lower() ~ " " if access }}{{ base }}{{ ", " if not loop.last }}
 {%- endfor -%}
@@ -17,6 +19,7 @@
   {%- set content -%}
   {%- for member in members if not member.is_implicit -%}
     {%- with obj = member -%}
+      {{- "\n" if (obj.template or obj.kind == "template") and not loop.first -}}
       {%- include "{}.jinja".format(obj.kind) with context -%}{{ "; " if not loop.last else ";\n" }}
     {%- endwith -%}
   {%- endfor -%}
@@ -24,3 +27,4 @@
   {{ content | indent(4, first=True) if content }}
 {%- endfor -%}
 }
+{%- endif -%}
