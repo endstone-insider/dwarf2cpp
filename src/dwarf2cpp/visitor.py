@@ -679,6 +679,8 @@ class Visitor:
 
     def _handle_struct(self, die: DWARFDie, struct: Struct) -> None:
         class_name = struct.name.split("<", maxsplit=1)[0] if struct.name else None
+        access = AccessAttribute.PRIVATE if isinstance(struct, Class) else AccessAttribute.PUBLIC
+
         for attribute in die.attributes:
             if attribute.name in {
                 "DW_AT_name",
@@ -729,7 +731,14 @@ class Visitor:
 
                 member = self._cache[child.offset]
                 member.parent = struct
+
+                # If no accessibility attribute is present, private access is assumed for members of a
+                # class and public access is assumed for members of a structure, union, or interface
+                if member.access is None:
+                    member.access = access
+
                 lines.append(member)
+
                 if isinstance(member, Function):
                     # constructors, destructors and operators should have no return type
                     if child.short_name.startswith("operator "):
@@ -751,7 +760,7 @@ class Visitor:
                     # TODO: handle template params
                     pass
                 case "DW_TAG_inheritance":
-                    access = None
+                    inherit_access = None
                     base = get_qualified_type(child.find("DW_AT_type").as_referenced_die())
                     for attribute in child.attributes:
                         if attribute.name in {
@@ -762,7 +771,7 @@ class Visitor:
 
                         match attribute.name:
                             case "DW_AT_accessibility":
-                                access = AccessAttribute(attribute.value.as_constant())
+                                inherit_access = AccessAttribute(attribute.value.as_constant())
                             case "DW_AT_virtuality":
                                 virtuality = VirtualityAttribute(attribute.value.as_constant())
                                 assert virtuality != VirtualityAttribute.NONE, "Expected non-NONE virtuality"
@@ -770,7 +779,7 @@ class Visitor:
                             case _:
                                 raise ValueError(f"Unhandled attribute {attribute.name}")
 
-                    struct.bases.append((base, access))
+                    struct.bases.append((base, inherit_access))
 
                 case _:
                     raise ValueError(f"Unhandled child tag {child.tag}")

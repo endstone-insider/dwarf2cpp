@@ -1,4 +1,4 @@
-{%- set ns = namespace(access=none) -%}
+{%- set ns = namespace(access='private' if obj.kind == "class" else 'public') -%}
 
 {{ obj.kind }}{{ " " ~ obj.name if obj.name }}{{ " alignas({})".format(obj.alignment) if obj.alignment }}
 {%- for base, access in obj.bases -%}
@@ -7,10 +7,11 @@
 {{ " {" }}
 {% for _, members in obj.members | dictsort -%}
   {%- if members|length > 0 -%}
-    {%- if members[0].access is not none and members[0].access != ns.access -%}
+    {%- set access = members[0].access.name.lower() -%}
+    {%- if access != ns.access -%}
         {%- if not loop.first -%}{{ "\n" }}{%- endif -%}
-        {{ members[0].access.name.lower() ~ ":\n" }}
-        {%- set ns.access = members[0].access -%}
+        {{ access ~ ":\n" }}
+        {%- set ns.access = access -%}
     {%- endif -%}
   {%- endif -%}
   {%- set content -%}

@@ -1,6 +1,6 @@
 from __future__ import annotations
+
 import enum
-import typing
 
 __all__: list[str] = [
     "AccessAttribute",
