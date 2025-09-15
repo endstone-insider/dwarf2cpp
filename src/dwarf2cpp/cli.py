@@ -16,7 +16,7 @@ logger = logging.getLogger("dwarf2cpp")
 
 @click.command()
 @click.argument("path", type=click.Path(exists=True, path_type=Path))
-@click.option("--base-dir", type=str, required=True, help="Base directory for compilation.")
+@click.option("--base-dir", type=str, required=True, help="Base directory used during compilation.")
 @click.option(
     "--output-path",
     "-o",

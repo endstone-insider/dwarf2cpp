@@ -8,14 +8,13 @@ Generate C++ headers from DWARF Debugging Information Format (DWARF).
 
 > \[!WARNING]
 > This tool requires binaries that contain **DWARF debug information** in order to generate headers.
-> Please make sure that your input binary includes DWARF debug info, which is often not available publicly for proprietary software.
+> Make sure your input binary includes DWARF debug info, which is often not publicly available in proprietary software.
 
 ## Installation
 
-### Build from Sources
+### Build from Source
 
-Since dwarf2cpp uses **pybind11** to use LLVM's DWARF DebugInfo module from Python, you need a working C++ toolchain to
-build it:
+Since dwarf2cpp uses **pybind11** to access LLVM's DWARF DebugInfo module from Python, you need a working C++ toolchain to build it:
 
 * On Windows: **MSVC (Visual Studio Build Tools)**
 * On Linux: **GCC (g++)**
@@ -27,7 +26,11 @@ cd dwarf2cpp
 pip install .
 ```
 
-After installation, the tool can be invoked using `python -m dwarf2cpp`.
+After installation, run the tool with:
+
+```
+python -m dwarf2cpp
+```
 
 ### Prebuilt Wheels
 
@@ -43,7 +46,7 @@ locally.
    pip install dwarf2cpp-<version>-<platform>.whl
    ```
 
-This option is recommended if you simply want to use `dwarf2cpp` without dealing with compiler or LLVM setup.
+This is the recommended option if you only want to use `dwarf2cpp` without setting up a compiler or LLVM.
 
 ## Usage
 
@@ -51,18 +54,16 @@ This option is recommended if you simply want to use `dwarf2cpp` without dealing
 Usage: python -m dwarf2cpp [OPTIONS] PATH
 
 Options:
-  --base-dir TEXT         Base directory for compilation.  [required]
+  --base-dir TEXT         Base directory used during compilation.  [required]
   -o, --output-path PATH  Output directory for generated files. Defaults to
                           'out' inside the input file's directory.
   --help                  Show this message and exit.
 ```
 
-The `PATH` argument should point to a binary that contains DWARF debug information.
+The `PATH` argument must point to a binary containing DWARF debug information.
 
-* `--base-dir` should point to the root directory used during compilation. This helps resolve relative include paths
-  when reconstructing headers.
-* `--output-path` lets you control where generated headers will be stored. If not provided, the tool creates an `out/`
-  folder next to the input file.
+* `--base-dir` should point to the root directory used during compilation. This helps resolve relative include paths when reconstructing headers.
+* `--output-path` controls where the generated headers are stored. If not specified, the tool creates an `out/` folder next to the input file.
 
 ## Examples
 
@@ -88,14 +89,14 @@ Typical use cases include:
 
 ## Limitations
 
-* Generated headers may not always compile out-of-the-box. Manual fixes may be necessary.
-* Templates, inline functions, and macros cannot always be reconstructed faithfully.
+* Generated headers may not compile out-of-the-box. Manual adjustments may be required.
+* Templates, inline functions, and macros cannot always be reconstructed accurately.
 * Only works with binaries compiled with DWARF debug info. Stripped or release binaries will not work.
-* Only trivially tested. It may not work on any binary with DWARF debug info.
+* Only trivially tested. It may fail with certain binaries.
 
 ## Acknowledgements
 
-This project makes use of the following open source technologies:
+This project makes use of the following open-source technologies:
 
 * [LLVM Project](https://llvm.org/) - DWARF DebugInfo parser.
 * [pybind11](https://pybind11.readthedocs.io/) - C++/Python bindings.
@@ -109,7 +110,7 @@ This project makes use of the following open source technologies:
 
 > [!WARNING]
 > Do not redistribute or publish headers generated from proprietary binaries without proper rights.
-> Respect the terms of service and licensing agreements for any binaries you analyse.
+> Respect the terms of service and licensing agreements of any binaries you analyse.
 
 ## Contributing
 
