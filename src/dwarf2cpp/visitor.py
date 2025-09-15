@@ -184,9 +184,8 @@ class Visitor:
                     continue
 
                 self.visit(child)
-                obj = self._cache.get(child.offset, None)
-                if obj is not None:
-                    self._add(decl_file, decl_line, obj)
+                if child.offset in self._cache:
+                    self._add(decl_file, decl_line, self._cache[child.offset])
 
             elif child.tag in {
                 "DW_TAG_base_type",
