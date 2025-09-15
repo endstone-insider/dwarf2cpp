@@ -14,7 +14,7 @@ requires = ["scikit-build-core-conan"]
 build-backend = "scikit_build_core_conan.build"
 
 [tool.scikit-build]
-wheel.exclude = ["src/dwarf2cpp/_dwarf.cpp"]
+wheel.exclude = ["*.cpp"]
 
 [[tool.scikit-build-core-conan.overrides]]
 if.platform-system = "win32"
