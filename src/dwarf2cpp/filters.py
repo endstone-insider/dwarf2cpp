@@ -35,7 +35,7 @@ def do_insert_name(tp: str | tuple[str, str], name: str):
         if not name:
             return "".join(tp)
 
-        if tp[0].endswith("*") and not tp[1].startswith("["):
+        if tp[0].endswith("*") and tp[1].startswith(")"):  # do not add space if pointer to (member) function
             return f"{tp[0]}{name}{tp[1]}"
 
         return f"{tp[0]} {name}{tp[1]}"

@@ -62,9 +62,6 @@ def get_qualified_type(die: DWARFDie, split=False) -> str | tuple[str, str]:
     printer.append_unqualified_name_after(die, inner)
     after = str(printer).strip()
 
-    if not after:
-        return before
-
     return before, after
 
 
@@ -627,8 +624,6 @@ class Visitor:
         else:
             variable.type = get_qualified_type(ty, split=True)
 
-        assert variable.type, "Expected type"
-
         for attribute in die.attributes:
             if attribute.name in {
                 "DW_AT_decl_file",
@@ -647,7 +642,17 @@ class Visitor:
 
             match attribute.name:
                 case "DW_AT_const_value":
-                    variable.default_value = attribute.value.as_constant()
+                    int_value = attribute.value.as_constant()
+                    t = variable.type[0]
+                    if t.endswith("float"):
+                        variable.default_value = float_to_str(struct.unpack("f", struct.pack("I", int_value))[0])
+                    elif t.endswith("double"):
+                        variable.default_value = double_to_str(struct.unpack("d", struct.pack("Q", int_value))[0])
+                    elif t.endswith("bool"):
+                        variable.default_value = "true" if bool(int_value) else "false"
+                    else:
+                        variable.default_value = int_value
+
                 case "DW_AT_alignment":
                     variable.alignment = attribute.value.as_constant()
                 case "DW_AT_accessibility":
@@ -669,13 +674,6 @@ class Visitor:
                 pass
             else:
                 raise ValueError(f"Unhandled child tag {child.tag}")
-
-        if variable.default_value is not None:
-            int_value = variable.default_value
-            if "float" in variable.type:
-                variable.default_value = float_to_str(struct.unpack("f", struct.pack("I", int_value))[0])
-            elif "double" in variable.type:
-                variable.default_value = double_to_str(struct.unpack("d", struct.pack("Q", int_value))[0])
 
         self._cache[die.offset] = variable
 
