@@ -199,7 +199,9 @@ class TemplateParameterKind(enum.StrEnum):
 class TemplateParameter:
     name: str
     kind: TemplateParameterKind
-    value_type: str | None = None
+    type: str | None = None
+    arg: str | None = field(default=None, compare=False)
+    default: str | None = None
 
 
 @dataclass
