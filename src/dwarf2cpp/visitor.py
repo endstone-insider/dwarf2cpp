@@ -706,7 +706,6 @@ class Visitor:
             raise ValueError(f"Unhandled child tag {child.tag}")
 
         self._cache[die.offset] = param
-        print(param)
 
     def generic_visit(self, die: DWARFDie) -> None:
         for child in die.children:

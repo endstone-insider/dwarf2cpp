@@ -229,6 +229,7 @@ class TemplateParameter:
             case TemplateParameterKind.PACK:
                 return TemplateParameter(
                     TemplateParameterKind.PACK,
+                    type=self.type,
                     parameters=[p.to_declaration() for p in self.parameters],
                     name=self.name,
                 )
@@ -255,7 +256,5 @@ class Template(Object):
             if p1.name != p2.name or p1.kind != p2.kind:
                 return False
 
-        for p1, p2 in zip(self.parameters, other.parameters):
-            raise NotImplementedError
-
+        # TODO: merge parameters
         return True
