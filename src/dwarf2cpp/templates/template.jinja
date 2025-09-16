@@ -7,9 +7,7 @@ template<
   {%- elif parameter.kind == "pack" -%}
     {{ parameter.type or "typename" }}...{{ " " ~ parameter.name if parameter.name }}
   {%- elif parameter.kind == "template" -%}
-    {%- with obj = parameter -%}
-    {%- include "template.jinja" with context %} class{{ " " ~ parameter.name if parameter.name }}{{ " = {}".format(parameter.default) if parameter.default is not none }}
-    {%- endwith -%}
+    template<typename> class{{ " " ~ parameter.name if parameter.name }}{{ " = {}".format(parameter.default) if parameter.default is not none }}
   {%- endif -%}
   {%- if not loop.last -%}, {% endif -%}
 {%- endfor -%}
