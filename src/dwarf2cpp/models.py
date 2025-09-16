@@ -201,6 +201,7 @@ class TemplateParameter:
     kind: TemplateParameterKind
     type: str | None = None
     arg: str | None = field(default=None, compare=False)
+    pack: list["TemplateParameter"] | None = field(default_factory=list, compare=False)
     default: str | None = None
 
 

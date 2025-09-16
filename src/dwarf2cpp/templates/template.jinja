@@ -2,9 +2,9 @@
 template<
 {%- for parameter in obj.parameters -%}
   {%- if parameter.kind == "type" -%}
-    typename{{ " " ~ parameter.name if parameter.name }}{{ " = {}".format(parameter.default) if parameter.default }}
+    typename{{ " " ~ parameter.name if parameter.name }}{{ " = {}".format(parameter.default) if parameter.default is not none }}
   {%- elif parameter.kind == "constant" -%}
-    {{ parameter.type }}{{ " " ~ parameter.name if parameter.name }}
+    {{ parameter.type }}{{ " " ~ parameter.name if parameter.name }}{{ " = {}".format(parameter.default) if parameter.default is not none }}
   {%- elif parameter.kind == "pack" -%}
     typename...{{ " " ~ parameter.name if parameter.name }}
   {%- elif parameter.kind == "template" -%}

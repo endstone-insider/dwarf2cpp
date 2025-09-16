@@ -107,11 +107,11 @@ class Visitor:
             List of files
         """
         for i, cu in (
-                pbar := tqdm(
-                    enumerate(self.context.compile_units),
-                    total=self.context.num_compile_units,
-                    bar_format="[{n_fmt}/{total_fmt}] {desc}",
-                )
+            pbar := tqdm(
+                enumerate(self.context.compile_units),
+                total=self.context.num_compile_units,
+                bar_format="[{n_fmt}/{total_fmt}] {desc}",
+            )
         ):
             cu_die = cu.unit_die
             name = cu_die.short_name
@@ -632,11 +632,50 @@ class Visitor:
         self._cache[die.offset] = param
 
     def visit_template_value_parameter(self, die: DWARFDie) -> None:
-        ty = get_qualified_type(die.find("DW_AT_type").as_referenced_die())
-        self._cache[die.offset] = TemplateParameter(die.short_name, TemplateParameterKind.CONSTANT, type=ty)
+        param = TemplateParameter(die.short_name, TemplateParameterKind.CONSTANT)
+        param.type = get_qualified_type(die.find("DW_AT_type").as_referenced_die())
+
+        if value := die.find("DW_AT_const_value"):
+            param.arg = value.as_constant()
+
+        for attribute in die.attributes:
+            if attribute.name in {"DW_AT_name", "DW_AT_type", "DW_AT_const_value", "DW_AT_location"}:
+                continue
+
+            match attribute.name:
+                case "DW_AT_default_value":
+                    param.default = param.arg
+                case _:
+                    raise ValueError(f"Unhandled attribute {attribute.name}")
+
+        for child in die.children:
+            raise ValueError(f"Unhandled child tag {child.tag}")
+
+        self._cache[die.offset] = param
 
     def visit_GNU_template_parameter_pack(self, die: DWARFDie) -> None:
-        self._cache[die.offset] = TemplateParameter(die.short_name, TemplateParameterKind.PACK)
+        param = TemplateParameter(die.short_name, TemplateParameterKind.PACK)
+
+        for attribute in die.attributes:
+            if attribute.name in {"DW_AT_name"}:
+                continue
+
+            match attribute.name:
+                case _:
+                    raise ValueError(f"Unhandled attribute {attribute.name}")
+
+        pack = []
+        for child in die.children:
+            if child.tag in {"DW_TAG_template_type_parameter", "DW_TAG_template_value_parameter"}:
+                self.visit(child)
+                pack.append(self._cache[child.offset])
+            else:
+                raise ValueError(f"Unhandled child tag {child.tag}")
+
+        if pack:
+            param.pack = pack
+
+        self._cache[die.offset] = param
 
     def visit_GNU_template_template_param(self, die: DWARFDie) -> None:
         self._cache[die.offset] = TemplateParameter(die.short_name, TemplateParameterKind.TEMPLATE)
@@ -661,9 +700,11 @@ class Visitor:
         # make a copy for template declaration
         template = copy.copy(template)
         for parameter in template.parameters:
-            parameter.arg = None  # declaration must not have type replacement
+            # declaration must not have type replacement
+            parameter.arg = None
+            parameter.pack = None
 
-        # try to merge with existing templates
+            # try to merge with existing templates
         for t in templates:
             if t.merge(template):
                 return None
