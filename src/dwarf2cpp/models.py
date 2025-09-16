@@ -209,3 +209,29 @@ class Template(Object):
     kind: ClassVar[str] = "template"
     declaration: Struct | Attribute | None = None
     parameters: list[TemplateParameter] = field(default_factory=list)
+
+    def merge(self, other: "Template") -> bool:
+        if not isinstance(other, Template):
+            return False
+
+        if (
+            self.name != other.name
+            or self.declaration != other.declaration
+            or len(self.parameters) != len(other.parameters)
+        ):
+            return False
+
+        for p1, p2 in zip(self.parameters, other.parameters):
+            if (
+                p1.name != p2.name
+                or p1.kind != p2.kind
+                or p1.type != p2.type
+                or p1.arg is not None
+                or p2.arg is not None
+            ):
+                return False
+
+        for p1, p2 in zip(self.parameters, other.parameters):
+            p1.default = p1.default or p2.default
+
+        return True
