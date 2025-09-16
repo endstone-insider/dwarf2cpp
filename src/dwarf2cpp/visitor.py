@@ -686,6 +686,7 @@ class Visitor:
 
         if parameters:
             param.parameters = parameters
+            param.type = pack_type
 
         self._cache[die.offset] = param
 
