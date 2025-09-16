@@ -95,6 +95,7 @@ class Visitor:
         self._cache = {}
         self._param_names: dict[str, list[str]] = {}
         self._functions: dict[str, list[Function]] = defaultdict(list)
+        self._templates: dict[str | int, dict[int, list[Template]]] = defaultdict(lambda: defaultdict(list))
 
     @property
     def files(self) -> Generator[tuple[str, dict[int, list[Object]]]]:
@@ -106,11 +107,11 @@ class Visitor:
             List of files
         """
         for i, cu in (
-            pbar := tqdm(
-                enumerate(self.context.compile_units),
-                total=self.context.num_compile_units,
-                bar_format="[{n_fmt}/{total_fmt}] {desc}",
-            )
+                pbar := tqdm(
+                    enumerate(self.context.compile_units),
+                    total=self.context.num_compile_units,
+                    bar_format="[{n_fmt}/{total_fmt}] {desc}",
+                )
         ):
             cu_die = cu.unit_die
             name = cu_die.short_name
@@ -191,7 +192,9 @@ class Visitor:
                 self.visit(child)
                 if child.offset in self._cache:
                     if template := self._cache[child.offset].template:
-                        self._add(decl_file, decl_line, template)
+                        if template := self._register_template(decl_file, decl_line, template):
+                            self._add(decl_file, decl_line, template)
+
                     self._add(decl_file, decl_line, self._cache[child.offset])
 
             elif child.tag in {
@@ -265,7 +268,7 @@ class Visitor:
                     member.parent = namespace
                     if template := member.template:
                         template.parent = namespace
-                        if template not in self._files[decl_file][decl_line]:
+                        if template := self._register_template(decl_file, decl_line, template):
                             self._add(decl_file, decl_line, template)
 
                     self._add(decl_file, decl_line, member)
@@ -604,11 +607,33 @@ class Visitor:
         self._cache[die.offset] = imported_decl
 
     def visit_template_type_parameter(self, die: DWARFDie) -> None:
-        self._cache[die.offset] = TemplateParameter(die.short_name, TemplateParameterKind.TYPE)
+        param = TemplateParameter(die.short_name, TemplateParameterKind.TYPE)
+
+        # A template type parameter entry has a DW_AT_type attribute
+        # describing the actual type by which the formal is replaced.
+        if ty := die.find("DW_AT_type"):
+            param.arg = get_qualified_type(ty.as_referenced_die())
+        else:
+            param.arg = "void"
+
+        for attribute in die.attributes:
+            if attribute.name in {"DW_AT_name", "DW_AT_type"}:
+                continue
+
+            match attribute.name:
+                case "DW_AT_default_value":
+                    param.default = param.arg
+                case _:
+                    raise ValueError(f"Unhandled attribute {attribute.name}")
+
+        for child in die.children:
+            raise ValueError(f"Unhandled child tag {child.tag}")
+
+        self._cache[die.offset] = param
 
     def visit_template_value_parameter(self, die: DWARFDie) -> None:
         ty = get_qualified_type(die.find("DW_AT_type").as_referenced_die())
-        self._cache[die.offset] = TemplateParameter(die.short_name, TemplateParameterKind.CONSTANT, value_type=ty)
+        self._cache[die.offset] = TemplateParameter(die.short_name, TemplateParameterKind.CONSTANT, type=ty)
 
     def visit_GNU_template_parameter_pack(self, die: DWARFDie) -> None:
         self._cache[die.offset] = TemplateParameter(die.short_name, TemplateParameterKind.PACK)
@@ -629,6 +654,22 @@ class Visitor:
             return
 
         lines.append(obj)
+
+    def _register_template(self, key: str | int, lineno: int, template: Template) -> Template | None:
+        templates = self._templates[key][lineno]
+
+        # make a copy for template declaration
+        template = copy.copy(template)
+        for parameter in template.parameters:
+            parameter.arg = None  # declaration must not have type replacement
+
+        # try to merge with existing templates
+        for t in templates:
+            if t.merge(template):
+                return None
+
+        templates.append(template)
+        return template
 
     def _handle_attribute(self, die: DWARFDie) -> None:
         if not die.decl_file or not die.decl_line or not die.short_name:
@@ -788,7 +829,7 @@ class Visitor:
                     if template.access is None:
                         template.access = access
 
-                    if template not in lines:
+                    if template := self._register_template(die.offset, child.decl_line, template):
                         lines.append(template)
 
                 lines.append(member)
