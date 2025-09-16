@@ -197,12 +197,41 @@ class TemplateParameterKind(enum.StrEnum):
 
 @dataclass
 class TemplateParameter:
-    name: str
     kind: TemplateParameterKind
-    type: str | None = None
-    arg: str | None = field(default=None, compare=False)
-    pack: list["TemplateParameter"] | None = field(default_factory=list, compare=False)
+    name: str | None = None
     default: str | None = None
+    type: str | None = None
+    value: str | None = None
+    parameters: list["TemplateParameter"] = field(default_factory=list)
+
+    def to_declaration(self) -> "TemplateParameter":
+        match self.kind:
+            case TemplateParameterKind.TYPE:
+                return TemplateParameter(
+                    TemplateParameterKind.TYPE,
+                    name=self.name,
+                    default=self.default,
+                )
+            case TemplateParameterKind.CONSTANT:
+                return TemplateParameter(
+                    TemplateParameterKind.CONSTANT,
+                    type=self.type,
+                    name=self.name,
+                    default=self.default,
+                )
+            case TemplateParameterKind.TEMPLATE:
+                return TemplateParameter(
+                    TemplateParameterKind.TEMPLATE,
+                    parameters=[p.to_declaration() for p in self.parameters],
+                    name=self.name,
+                    default=self.default,
+                )
+            case TemplateParameterKind.PACK:
+                return TemplateParameter(
+                    TemplateParameterKind.PACK,
+                    parameters=[p.to_declaration() for p in self.parameters],
+                    name=self.name,
+                )
 
 
 @dataclass
@@ -223,16 +252,10 @@ class Template(Object):
             return False
 
         for p1, p2 in zip(self.parameters, other.parameters):
-            if (
-                p1.name != p2.name
-                or p1.kind != p2.kind
-                or p1.type != p2.type
-                or p1.arg is not None
-                or p2.arg is not None
-            ):
+            if p1.name != p2.name or p1.kind != p2.kind:
                 return False
 
         for p1, p2 in zip(self.parameters, other.parameters):
-            p1.default = p1.default or p2.default
+            raise NotImplementedError
 
         return True
