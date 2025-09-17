@@ -548,11 +548,11 @@ class Visitor:
                     if param_names[i] is None and param.name is not None:
                         param_names[i] = param.name
 
-        # if template_params:
-        #     function.template = Template(name="")
-        #     for template_param in template_params:
-        #         self.visit(template_param)
-        #         function.template.parameters.append(self._cache[template_param.offset])
+        if template_params:
+            function.template = Template(name="")  # without declaration as there is no trivial way to infer that
+            for template_param in template_params:
+                self.visit(template_param)
+                function.template.parameters.append(self._cache[template_param.offset])
 
         self._cache[die.offset] = function
 
@@ -664,29 +664,28 @@ class Visitor:
                 case _:
                     raise ValueError(f"Unhandled attribute {attribute.name}")
 
-        pack_type = None
         parameters = []
         for child in die.children:
             if child.tag == "DW_TAG_template_type_parameter":
-                assert pack_type is None, "Expected pack type to be None"
                 self.visit(child)
                 p = self._cache[child.offset]
                 parameters.append(p)
             elif child.tag == "DW_TAG_template_value_parameter":
                 self.visit(child)
                 p = self._cache[child.offset]
-                if pack_type is None:
-                    assert len(parameters) == 0, "Expected no parameters"
-                    pack_type = p.type
-                else:
-                    assert p.type == pack_type, "Expected same type"
                 parameters.append(p)
             else:
                 raise ValueError(f"Unhandled child tag {child.tag}")
 
         if parameters:
+            assert all(p.kind == parameters[0].kind for p in parameters), "Parameter kind mismatch"
+            if all(p.value is not None for p in parameters):
+                if all(p.type == parameters[0].type for p in parameters):
+                    param.type = parameters[0].type
+                else:
+                    param.type = "auto"
+
             param.parameters = parameters
-            param.type = pack_type
 
         self._cache[die.offset] = param
 
@@ -723,6 +722,9 @@ class Visitor:
         lines.append(obj)
 
     def _register_template(self, key: str | int, lineno: int, template: Template) -> Template | None:
+        if not template.declaration:
+            return None
+
         templates = self._templates[key][lineno]
 
         # make a copy for template declaration

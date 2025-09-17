@@ -1,3 +1,8 @@
+{%- if obj.template -%}
+{%- with obj = obj.template -%}
+{% include "template.jinja".format(obj.kind) with context %}
+{% endwith -%}
+{%- endif -%}
 {{- "[[noreturn]] " if obj.noreturn -}}
 {{- "virtual " if obj.virtuality -}}
 {{- "explicit " if obj.is_explicit -}}
