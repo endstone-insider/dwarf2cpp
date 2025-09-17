@@ -222,7 +222,6 @@ class TemplateParameter:
             case TemplateParameterKind.TEMPLATE:
                 return TemplateParameter(
                     TemplateParameterKind.TEMPLATE,
-                    parameters=[p.to_declaration() for p in self.parameters],
                     name=self.name,
                     default=self.default,
                 )
@@ -230,7 +229,6 @@ class TemplateParameter:
                 return TemplateParameter(
                     TemplateParameterKind.PACK,
                     type=self.type,
-                    parameters=[p.to_declaration() for p in self.parameters],
                     name=self.name,
                 )
 
@@ -253,8 +251,10 @@ class Template(Object):
             return False
 
         for p1, p2 in zip(self.parameters, other.parameters):
-            if p1.name != p2.name or p1.kind != p2.kind:
+            if p1.kind != p2.kind or p1.name != p2.name or p1.type != p2.type:
                 return False
 
-        # TODO: merge parameters
+        for p1, p2 in zip(self.parameters, other.parameters):
+            p1.default = p1.default or p2.default
+
         return True
