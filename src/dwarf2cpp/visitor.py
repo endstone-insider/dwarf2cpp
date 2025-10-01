@@ -189,10 +189,11 @@ class Visitor:
                 "DW_TAG_imported_module",
                 "DW_TAG_imported_declaration",
             }:
-                if not child.find("DW_AT_decl_file"):
+                decl_file = child.decl_file
+                if not decl_file:
                     continue
 
-                decl_file = posixpath.normpath(child.decl_file.replace("\\", "/"))
+                decl_file = posixpath.normpath(decl_file.replace("\\", "/"))
                 if not decl_file.startswith(self._base_dir):
                     continue
 
@@ -261,10 +262,11 @@ class Visitor:
                 "DW_TAG_imported_module",
                 "DW_TAG_imported_declaration",
             }:
-                if not child.find("DW_AT_decl_file"):
+                decl_file = child.decl_file
+                if not decl_file:
                     continue
 
-                decl_file = posixpath.abspath(child.decl_file.replace("\\", "/"))
+                decl_file = posixpath.abspath(decl_file.replace("\\", "/"))
                 if not decl_file.startswith(self._base_dir):
                     continue
 
