@@ -135,9 +135,6 @@ class Visitor:
             pbar.set_description_str(f"Visiting compile unit {rel_path})")
             self.visit(cu_die)
 
-            if i >= 40:
-                break
-
         for key, param_names in self._param_names.items():
             functions = self._functions[key]
             for function in functions:
@@ -294,7 +291,7 @@ class Visitor:
 
         typedef = TypeDef(name=die.short_name)
         if type_attr := die.find("DW_AT_type"):
-            type_die = type_attr.as_referenced_die()
+            type_die = type_attr.as_referenced_die().resolve_type_unit_reference()
             if type_die.short_name is None and type_die.tag in {
                 "DW_TAG_class_type",
                 "DW_TAG_union_type",
@@ -350,7 +347,7 @@ class Visitor:
 
             match attribute.name:
                 case "DW_AT_type":
-                    enum.base = get_qualified_type(attribute.value.as_referenced_die())
+                    enum.base = get_qualified_type(attribute.value.as_referenced_die().resolve_type_unit_reference())
                 case "DW_AT_enum_class":
                     enum.is_class = True
                 case _:
@@ -422,7 +419,7 @@ class Visitor:
                 op = op.as_referenced_die()
                 t = op.find("DW_AT_type")
                 while t:
-                    t = t.as_referenced_die()
+                    t = t.as_referenced_die().resolve_type_unit_reference()
                     if t.tag == "DW_TAG_const_type":
                         declaration.is_const = True
                         break
@@ -442,7 +439,7 @@ class Visitor:
             name = die.short_name
             returns = "void"
             if ret := die.find("DW_AT_type"):
-                returns = get_qualified_type(ret.as_referenced_die())
+                returns = get_qualified_type(ret.as_referenced_die().resolve_type_unit_reference())
 
             function = Function(name=name, returns=returns)
 
@@ -531,7 +528,8 @@ class Visitor:
 
                     parameter = Parameter(
                         name=child.short_name,
-                        type=get_qualified_type(child.find("DW_AT_type").as_referenced_die(), split=True),
+                        type=get_qualified_type(
+                            child.find("DW_AT_type").as_referenced_die().resolve_type_unit_reference(), split=True),
                         kind=ParameterKind.POSITIONAL,
                     )
                     function.parameters.append(parameter)
@@ -632,7 +630,7 @@ class Visitor:
         # A template type parameter entry has a DW_AT_type attribute
         # describing the actual type by which the formal is replaced.
         if ty := die.find("DW_AT_type"):
-            param.type = get_qualified_type(ty.as_referenced_die())
+            param.type = get_qualified_type(ty.as_referenced_die().resolve_type_unit_reference())
         else:
             param.type = "void"
 
@@ -653,7 +651,7 @@ class Visitor:
 
     def visit_template_value_parameter(self, die: DWARFDie) -> None:
         param = TemplateParameter(TemplateParameterKind.CONSTANT, name=die.short_name)
-        param.type = get_qualified_type(die.find("DW_AT_type").as_referenced_die())
+        param.type = get_qualified_type(die.find("DW_AT_type").as_referenced_die().resolve_type_unit_reference())
 
         if value := die.find("DW_AT_const_value"):
             param.value = value.as_constant()
@@ -770,7 +768,7 @@ class Visitor:
 
         variable = Attribute(name=die.short_name)
         ty = die.find("DW_AT_type")
-        ty = ty.as_referenced_die()
+        ty = ty.as_referenced_die().resolve_type_unit_reference()
         if ty.short_name is None and ty.tag in {
             "DW_TAG_class_type",
             "DW_TAG_union_type",
@@ -946,7 +944,8 @@ class Visitor:
             match child.tag:
                 case "DW_TAG_inheritance":
                     inherit_access = None
-                    base = get_qualified_type(child.find("DW_AT_type").as_referenced_die())
+                    base = get_qualified_type(
+                        child.find("DW_AT_type").as_referenced_die().resolve_type_unit_reference())
                     for attribute in child.attributes:
                         if attribute.name in {
                             "DW_AT_type",
