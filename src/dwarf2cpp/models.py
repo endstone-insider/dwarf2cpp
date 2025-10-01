@@ -59,7 +59,7 @@ class Attribute(Object):
     bit_size: int | None = None
     is_static: bool = False
 
-    def merge(self, other: "Object") -> bool:
+    def merge(self, other: Object) -> bool:
         if not isinstance(other, Attribute):
             return False
 
@@ -101,7 +101,7 @@ class Function(Object):
     is_const: bool = False
     virtuality: VirtualityAttribute | None = None
 
-    def merge(self, other: "Function") -> bool:
+    def merge(self, other: Object) -> bool:
         if not isinstance(other, Function):
             return False
 
@@ -133,7 +133,7 @@ class Struct(Object):
     members: dict[int, list[Object]] = field(default_factory=lambda: defaultdict(list))
     alignment: int | None = None
 
-    def merge(self, other: "Struct") -> bool:
+    def merge(self, other: Object) -> bool:
         if not isinstance(other, Struct):
             return False
 
@@ -187,6 +187,23 @@ class TypeDef(Object):
     value: str | Struct | Class | Union | Enum | None = None
     alignment: int | None = None
 
+    def merge(self, other: Object) -> bool:
+        if not isinstance(other, TypeDef):
+            return False
+
+        if self.kind != other.kind or self.name != other.name or type(self.value) != type(other.value):
+            return False
+
+        if isinstance(self.value, str):
+            if self.value != other.value:
+                return False
+        else:
+            if not self.value.merge(other.value):
+                return False
+
+        self.alignment = self.alignment or other.alignment
+        return True
+
 
 class TemplateParameterKind(enum.StrEnum):
     CONSTANT = "constant"
@@ -239,7 +256,7 @@ class Template(Object):
     declaration: Struct | Attribute | None = None
     parameters: list[TemplateParameter] = field(default_factory=list)
 
-    def merge(self, other: "Template") -> bool:
+    def merge(self, other: Object) -> bool:
         if not isinstance(other, Template):
             return False
 
