@@ -191,7 +191,7 @@ class TypeDef(Object):
         if not isinstance(other, TypeDef):
             return False
 
-        if self.kind != other.kind or self.name != other.name or type(self.value) != type(other.value):
+        if self.kind != other.kind or self.name != other.name or type(self.value) is not type(other.value):
             return False
 
         if isinstance(self.value, str):
