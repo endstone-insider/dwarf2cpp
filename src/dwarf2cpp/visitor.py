@@ -118,11 +118,11 @@ class Visitor:
             List of files
         """
         for i, cu in (
-                pbar := tqdm(
-                    enumerate(self.context.compile_units),
-                    total=self.context.num_compile_units,
-                    bar_format="[{n_fmt}/{total_fmt}] {desc}",
-                )
+            pbar := tqdm(
+                enumerate(self.context.compile_units),
+                total=self.context.num_compile_units,
+                bar_format="[{n_fmt}/{total_fmt}] {desc}",
+            )
         ):
             cu_die = cu.unit_die
             name = cu_die.short_name
@@ -529,7 +529,8 @@ class Visitor:
                     parameter = Parameter(
                         name=child.short_name,
                         type=get_qualified_type(
-                            child.find("DW_AT_type").as_referenced_die().resolve_type_unit_reference(), split=True),
+                            child.find("DW_AT_type").as_referenced_die().resolve_type_unit_reference(), split=True
+                        ),
                         kind=ParameterKind.POSITIONAL,
                     )
                     function.parameters.append(parameter)
@@ -945,7 +946,8 @@ class Visitor:
                 case "DW_TAG_inheritance":
                     inherit_access = None
                     base = get_qualified_type(
-                        child.find("DW_AT_type").as_referenced_die().resolve_type_unit_reference())
+                        child.find("DW_AT_type").as_referenced_die().resolve_type_unit_reference()
+                    )
                     for attribute in child.attributes:
                         if attribute.name in {
                             "DW_AT_type",
