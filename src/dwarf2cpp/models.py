@@ -11,7 +11,7 @@ class Object:
     kind: ClassVar[str]
 
     name: str
-    parent: "Namespace | None" = field(default=None, compare=False)
+    parent: "Namespace | Object | None" = field(default=None, compare=False)
     is_implicit: bool = False
     is_declaration: bool = False
     access: AccessAttribute | None = None

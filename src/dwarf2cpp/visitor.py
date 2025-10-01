@@ -103,7 +103,7 @@ class Visitor:
         self.context = context
         self._files: dict[str, dict[int, list[Object]]] = defaultdict(lambda: defaultdict(list))
         self._base_dir = base_dir
-        self._cache = {}
+        self._objects = defaultdict(dict)
         self._param_names: dict[str, list[str]] = {}
         self._functions: dict[str, list[Function]] = defaultdict(list)
         self._templates: dict[str | int, dict[int, list[Template]]] = defaultdict(lambda: defaultdict(list))
@@ -118,11 +118,11 @@ class Visitor:
             List of files
         """
         for i, cu in (
-            pbar := tqdm(
-                enumerate(self.context.compile_units),
-                total=self.context.num_compile_units,
-                bar_format="[{n_fmt}/{total_fmt}] {desc}",
-            )
+                pbar := tqdm(
+                    enumerate(self.context.compile_units),
+                    total=self.context.num_compile_units,
+                    bar_format="[{n_fmt}/{total_fmt}] {desc}",
+                )
         ):
             cu_die = cu.unit_die
             name = cu_die.short_name
@@ -134,6 +134,9 @@ class Visitor:
 
             pbar.set_description_str(f"Visiting compile unit {rel_path})")
             self.visit(cu_die)
+
+            if i >= 40:
+                break
 
         for key, param_names in self._param_names.items():
             functions = self._functions[key]
@@ -166,7 +169,7 @@ class Visitor:
             yield rel_path, file
 
     def visit(self, die: DWARFDie) -> None:
-        if die.offset in self._cache:
+        if self._get(die):
             return
 
         kind = die.tag.split("DW_TAG_", maxsplit=1)[1]
@@ -192,7 +195,7 @@ class Visitor:
                 if not child.find("DW_AT_decl_file"):
                     continue
 
-                decl_file = posixpath.abspath(child.decl_file.replace("\\", "/"))
+                decl_file = posixpath.normpath(child.decl_file.replace("\\", "/"))
                 if not decl_file.startswith(self._base_dir):
                     continue
 
@@ -201,12 +204,12 @@ class Visitor:
                     continue
 
                 self.visit(child)
-                if child.offset in self._cache:
-                    if template := self._cache[child.offset].template:
+                if obj := self._get(child):
+                    if template := obj.template:
                         if template := self._register_template(decl_file, decl_line, template):
                             self._add(decl_file, decl_line, template)
 
-                    self._add(decl_file, decl_line, self._cache[child.offset])
+                    self._add(decl_file, decl_line, obj)
 
             elif child.tag in {
                 "DW_TAG_base_type",
@@ -241,12 +244,12 @@ class Visitor:
                 case _:
                     raise ValueError(f"Unhandled attribute {attribute.name}")
 
-        self._cache[die.offset] = namespace
+        self._set(die, namespace)
 
         for child in die.children:
             if child.tag == "DW_TAG_namespace":
                 self.visit(child)
-                member = self._cache[child.offset]
+                member = self._get(child)
                 assert member.parent is None, "Already has a parent"
                 member.parent = namespace
 
@@ -273,8 +276,7 @@ class Visitor:
                     continue
 
                 self.visit(child)
-                if child.offset in self._cache:
-                    member = self._cache[child.offset]
+                if member := self._get(child):
                     assert member.parent is None, "Already has a parent"
                     member.parent = namespace
                     if template := member.template:
@@ -301,7 +303,7 @@ class Visitor:
             }:
                 # this is an in-place declaration
                 self.visit(type_die)
-                value = self._cache[type_die.offset]
+                value = self._get(type_die)
                 value.is_implicit = True
                 typedef.value = value
             else:
@@ -323,13 +325,14 @@ class Visitor:
                     print(die.dump())
                     raise ValueError(f"Unhandled attribute {attribute.name}")
 
-        self._cache[die.offset] = typedef
+        self._set(die, typedef)
 
     def visit_class_type(self, die: DWARFDie) -> None:
         self._handle_struct(
             die,
             Class(name=die.short_name),
         )
+        self.visit(die.resolve_type_unit_reference())
 
     def visit_enumeration_type(self, die: DWARFDie) -> None:
         enum = Enum(name=die.short_name)
@@ -341,6 +344,7 @@ class Visitor:
                 "DW_AT_name",
                 "DW_AT_byte_size",
                 "DW_AT_declaration",
+                "DW_AT_signature",
             }:
                 continue
 
@@ -364,19 +368,22 @@ class Visitor:
                 case _:
                     raise ValueError(f"Unhandled child tag {child.tag}")
 
-        self._cache[die.offset] = enum
+        self._set(die, enum)
+        self.visit(die.resolve_type_unit_reference())
 
     def visit_union_type(self, die: DWARFDie) -> None:
         self._handle_struct(
             die,
             Union(name=die.short_name),
         )
+        self.visit(die.resolve_type_unit_reference())
 
     def visit_structure_type(self, die: DWARFDie) -> None:
         self._handle_struct(
             die,
             Struct(name=die.short_name),
         )
+        self.visit(die.resolve_type_unit_reference())
 
     def visit_variable(self, die: DWARFDie) -> None:
         self._handle_attribute(die)
@@ -384,7 +391,7 @@ class Visitor:
     def visit_member(self, die: DWARFDie) -> None:
         self._handle_attribute(die)
 
-        member = self._cache.get(die.offset)
+        member = self._get(die)
         if member and die.find("DW_AT_external"):
             member.is_static = True
 
@@ -403,10 +410,9 @@ class Visitor:
             assert spec.tag == "DW_TAG_subprogram", "Expected DW_TAG_subprogram for DW_AT_specification attribute."
 
             self.visit(spec)
-            if spec.offset not in self._cache:
+            declaration = self._get(spec)
+            if not declaration:
                 return
-
-            declaration = self._cache[spec.offset]
 
             op = die.find("DW_AT_object_pointer")
             if not op:
@@ -451,6 +457,7 @@ class Visitor:
                 "DW_AT_frame_base",
                 "DW_AT_call_all_calls",
                 "DW_AT_calling_convention",
+                "DW_AT_GNU_all_call_sites",
                 "DW_AT_declaration",
                 "DW_AT_prototyped",
                 "DW_AT_artificial",
@@ -503,6 +510,7 @@ class Visitor:
                 "DW_TAG_class_type",
                 "DW_TAG_structure_type",
                 "DW_TAG_union_type",
+                "DW_TAG_GNU_call_site",
             }:
                 # TODO: handle local variables, types and functions
                 continue
@@ -548,7 +556,7 @@ class Visitor:
             # declaration with no DW_AT_linkage_name. Since we know the relationship, we can manually add the
             # declaration to the function map
             if spec and not spec.linkage_name:
-                self._functions[key].append(self._cache[spec.offset])
+                self._functions[key].append(self._get(spec))
 
             if key not in self._param_names:
                 self._param_names[key] = [p.name for p in function.parameters]
@@ -563,9 +571,9 @@ class Visitor:
             function.template = Template(name="")  # without declaration as there is no trivial way to infer that
             for template_param in template_params:
                 self.visit(template_param)
-                function.template.parameters.append(self._cache[template_param.offset])
+                function.template.parameters.append(self._get(template_param))
 
-        self._cache[die.offset] = function
+        self._set(die, function)
 
     def visit_imported_module(self, die: DWARFDie) -> None:
         if not die.decl_file or not die.decl_line:
@@ -576,7 +584,7 @@ class Visitor:
             f"Expected DW_TAG_namespace for DW_AT_import attribute. Got: {import_die.tag}"
         )
         self.visit(import_die)
-        import_ = self._cache[import_die.offset]
+        import_ = self._get(import_die)
         imported_module = ImportedModule(name="", import_=import_)
 
         for attribute in die.attributes:
@@ -585,7 +593,7 @@ class Visitor:
 
             raise ValueError(f"Unhandled attribute {attribute.name}")
 
-        self._cache[die.offset] = imported_module
+        self._set(die, imported_module)
 
     def visit_imported_declaration(self, die: DWARFDie) -> None:
         if not die.decl_file or not die.decl_line:
@@ -593,11 +601,12 @@ class Visitor:
 
         import_die = die.find("DW_AT_import").as_referenced_die()
         self.visit(import_die)
-        if import_die.offset not in self._cache:
+        import_ = self._get(import_die)
+
+        if not import_:
             return
 
         if import_die.tag == "DW_TAG_namespace":
-            import_ = self._cache[import_die.offset]
             imported_decl = ImportedDeclaration(name=die.short_name, import_=import_)
         else:
             imported_decl = ImportedDeclaration(name="", import_=get_qualified_type(import_die))
@@ -615,7 +624,7 @@ class Visitor:
 
             raise ValueError(f"Unhandled attribute {attribute.name}")
 
-        self._cache[die.offset] = imported_decl
+        self._set(die, imported_decl)
 
     def visit_template_type_parameter(self, die: DWARFDie) -> None:
         param = TemplateParameter(TemplateParameterKind.TYPE, name=die.short_name)
@@ -640,7 +649,7 @@ class Visitor:
         for child in die.children:
             raise ValueError(f"Unhandled child tag {child.tag}")
 
-        self._cache[die.offset] = param
+        self._set(die, param)
 
     def visit_template_value_parameter(self, die: DWARFDie) -> None:
         param = TemplateParameter(TemplateParameterKind.CONSTANT, name=die.short_name)
@@ -662,7 +671,7 @@ class Visitor:
         for child in die.children:
             raise ValueError(f"Unhandled child tag {child.tag}")
 
-        self._cache[die.offset] = param
+        self._set(die, param)
 
     def visit_GNU_template_parameter_pack(self, die: DWARFDie) -> None:
         param = TemplateParameter(TemplateParameterKind.PACK, name=die.short_name)
@@ -679,11 +688,11 @@ class Visitor:
         for child in die.children:
             if child.tag == "DW_TAG_template_type_parameter":
                 self.visit(child)
-                p = self._cache[child.offset]
+                p = self._get(child)
                 parameters.append(p)
             elif child.tag == "DW_TAG_template_value_parameter":
                 self.visit(child)
-                p = self._cache[child.offset]
+                p = self._get(child)
                 parameters.append(p)
             else:
                 raise ValueError(f"Unhandled child tag {child.tag}")
@@ -698,7 +707,7 @@ class Visitor:
 
             param.parameters = parameters
 
-        self._cache[die.offset] = param
+        self._set(die, param)
 
     def visit_GNU_template_template_param(self, die: DWARFDie) -> None:
         param = TemplateParameter(TemplateParameterKind.TEMPLATE, name=die.short_name)
@@ -716,7 +725,7 @@ class Visitor:
         for child in die.children:
             raise ValueError(f"Unhandled child tag {child.tag}")
 
-        self._cache[die.offset] = param
+        self._set(die, param)
 
     def generic_visit(self, die: DWARFDie) -> None:
         for child in die.children:
@@ -770,7 +779,7 @@ class Visitor:
         }:
             # this is an in-place declaration
             self.visit(ty)
-            value = self._cache[ty.offset]
+            value = self._get(ty)
             value.is_implicit = True
             variable.type = value
         else:
@@ -817,7 +826,7 @@ class Visitor:
                     print(die.dump())
                     raise ValueError(f"Unhandled attribute {attribute.name}")
 
-        template_params = []
+        template_params: list[DWARFDie] = []
         for child in die.children:
             if child.tag in {
                 "DW_TAG_template_type_parameter",
@@ -838,9 +847,9 @@ class Visitor:
             variable.template = Template(name="", declaration=declaration)
             for template_param in template_params:
                 self.visit(template_param)
-                variable.template.parameters.append(self._cache[template_param.offset])
+                variable.template.parameters.append(self._get(template_param))
 
-        self._cache[die.offset] = variable
+        self._set(die, variable)
 
     def _handle_struct(self, die: DWARFDie, struct: Struct) -> None:
         class_name = struct.name.split("<", maxsplit=1)[0] if struct.name else None
@@ -856,6 +865,7 @@ class Visitor:
                 "DW_AT_declaration",
                 "DW_AT_containing_type",
                 "DW_AT_export_symbols",
+                "DW_AT_signature",  # used by DWARFv4, removed in DWARFv5
             }:
                 continue
 
@@ -868,7 +878,7 @@ class Visitor:
                     print(die.dump())
                     raise ValueError(f"Unhandled attribute {attribute.name}")
 
-        self._cache[die.offset] = struct
+        self._set(die, struct)
 
         template_params = []
         for child in die.children:
@@ -892,10 +902,10 @@ class Visitor:
                     continue
 
                 self.visit(child)
-                if child.offset not in self._cache:
+                if self._get(child) is None:
                     continue
 
-                member = self._cache[child.offset]
+                member = self._get(child)
                 member.parent = struct
 
                 # If no accessibility attribute is present, private access is assumed for members of a
@@ -970,4 +980,11 @@ class Visitor:
             struct.template = Template(name="", declaration=declaration)
             for template_param in template_params:
                 self.visit(template_param)
-                struct.template.parameters.append(self._cache[template_param.offset])
+                struct.template.parameters.append(self._get(template_param))
+
+    def _get(self, die: DWARFDie):
+        return self._objects[die.unit.is_type_unit].get(die.offset, None)
+
+    def _set(self, die: DWARFDie, obj) -> None:
+        assert die.offset not in self._objects[die.unit.is_type_unit]
+        self._objects[die.unit.is_type_unit][die.offset] = obj

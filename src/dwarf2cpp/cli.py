@@ -27,6 +27,7 @@ logger = logging.getLogger("dwarf2cpp")
 def main(path: Path, base_dir: str, output_path: Path | None):
     output_path = output_path or (path.parent / "out")
 
+    logger.info(f'Creating DWARF context for "{path.absolute()}"')
     ctx = DWARFContext(str(path))
     visitor = Visitor(ctx, base_dir)
 
