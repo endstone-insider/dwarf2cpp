@@ -106,7 +106,7 @@ class Visitor:
                 pbar.set_description_str(f"Skipping compile unit {compilation_dir}")
                 continue
 
-            rel_path = posixpath.relpath(self._base_dir, compilation_dir)
+            rel_path = posixpath.relpath(cu_die.short_name, self._base_dir)
             pbar.set_description_str(f"Visiting compile unit {rel_path}")
             self.visit(cu_die)
 
