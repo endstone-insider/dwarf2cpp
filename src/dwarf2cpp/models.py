@@ -54,7 +54,7 @@ class Attribute(Object):
     kind: ClassVar[str] = "attribute"
     # attributes
     type: str | tuple[str, str] | None = None
-    default_value: int | float | None = None
+    default_value: int | str | None = None
     alignment: int | None = None
     bit_size: int | None = None
     is_static: bool = False
