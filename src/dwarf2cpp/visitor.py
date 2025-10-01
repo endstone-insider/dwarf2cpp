@@ -109,7 +109,7 @@ class Visitor:
         self._templates: dict[str | int, dict[int, list[Template]]] = defaultdict(lambda: defaultdict(list))
 
     @property
-    def files(self) -> Generator[tuple[str, dict[int, list[Object]]]]:
+    def files(self) -> Generator[tuple[str, dict[int, list[Object]]], None, None]:
         """Build and return the files attached to this visitor.
 
         This method triggers a complete visit of the compile units.
