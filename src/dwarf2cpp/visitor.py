@@ -38,10 +38,8 @@ from .models import (
 logger = logging.getLogger("dwarf2cpp")
 
 
-
-
 @functools.cache
-def get_qualified_type(die: DWARFDie,  split=False) -> str | tuple[str, str]:
+def get_qualified_type(die: DWARFDie, split=False) -> str | tuple[str, str]:
     printer = DWARFTypePrinter()
     if not split:
         printer.append_qualified_name(die)
@@ -102,14 +100,14 @@ class Visitor:
             )
         ):
             cu_die = cu.unit_die
-            name = cu_die.short_name
             compilation_dir = cu.compilation_dir.replace("\\", "/")
-            rel_path = posixpath.relpath(name, compilation_dir)
+
             if not compilation_dir.startswith(self._base_dir):
-                pbar.set_description_str(f"Skipping compile unit {rel_path})")
+                pbar.set_description_str(f"Skipping compile unit {compilation_dir}")
                 continue
 
-            pbar.set_description_str(f"Visiting compile unit {rel_path})")
+            rel_path = posixpath.relpath(self._base_dir, compilation_dir)
+            pbar.set_description_str(f"Visiting compile unit {rel_path}")
             self.visit(cu_die)
 
         for key, param_names in self._param_names.items():
