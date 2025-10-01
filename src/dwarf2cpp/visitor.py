@@ -38,46 +38,23 @@ from .models import (
 logger = logging.getLogger("dwarf2cpp")
 
 
-def scoped_tags(tag: str) -> bool:
-    """Return True if the DIE is a C++ scope component"""
-    return tag in {
-        "DW_TAG_structure_type",
-        "DW_TAG_class_type",
-        "DW_TAG_union_type",
-        "DW_TAG_namespace",
-        "DW_TAG_enumeration_type",
-        "DW_TAG_typedef",
-    }
 
 
 @functools.cache
-def get_qualified_type(die: DWARFDie, relative: DWARFDie | None = None, split=False) -> str | tuple[str, str]:
+def get_qualified_type(die: DWARFDie,  split=False) -> str | tuple[str, str]:
     printer = DWARFTypePrinter()
-    if scoped_tags(die.tag):
-        printer.append_scopes(die.parent)
-
-    def relative_scope(ty: str, relative: DWARFDie | None = None) -> str:
-        if not relative or relative.tag in {"DW_TAG_compile_unit", "DW_TAG_type_unit", "DW_TAG_skeleton_unit"}:
-            return ty
-
-        output = ty.replace(get_qualified_type(relative) + "::", "")
-        if output != ty:
-            return output
-
-        return relative_scope(ty, relative.parent)
-
     if not split:
-        printer.append_unqualified_name(die)
+        printer.append_qualified_name(die)
         ty = str(printer).strip()
-        return relative_scope(ty, relative)
+        return ty
     else:
-        inner = printer.append_unqualified_name_before(die)
+        inner = printer.append_qualified_name_before(die)
         before = str(printer).strip()
 
         printer = DWARFTypePrinter()
         printer.append_unqualified_name_after(die, inner)
         after = str(printer).strip()
-        return relative_scope(before, relative), after
+        return before, after
 
 
 def float_to_str(value: float) -> str:

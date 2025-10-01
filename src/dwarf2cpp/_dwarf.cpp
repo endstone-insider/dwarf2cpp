@@ -1,6 +1,7 @@
+#include "type_printer.h"
+
 #include <llvm/ADT/StringSwitch.h>
 #include <llvm/DebugInfo/DWARF/DWARFContext.h>
-#include <llvm/DebugInfo/DWARF/DWARFTypePrinter.h>
 #include <llvm/DebugInfo/DWARF/DWARFTypeUnit.h>
 #include <llvm/Demangle/Demangle.h>
 #include <pybind11/native_enum.h>
@@ -91,24 +92,21 @@ private:
 class PyDWARFTypePrinter {
 public:
     PyDWARFTypePrinter() : os(buffer), printer(os) {}
-
     std::string string() {
         os.flush();
         return buffer;
     }
-
     auto appendQualifiedName(llvm::DWARFDie die) { printer.appendQualifiedName(die); }
-
+    llvm::DWARFDie appendQualifiedNameBefore(llvm::DWARFDie die) {
+        return printer.appendQualifiedNameBefore(die);
+    }
     auto appendUnqualifiedName(llvm::DWARFDie die) { printer.appendUnqualifiedName(die); }
-
     auto appendUnqualifiedNameBefore(llvm::DWARFDie die) {
         return printer.appendUnqualifiedNameBefore(die);
     }
-
     auto appendUnqualifiedNameAfter(llvm::DWARFDie die, llvm::DWARFDie inner) {
         printer.appendUnqualifiedNameAfter(die, inner);
     }
-
     auto appendScopes(llvm::DWARFDie die) { printer.appendScopes(die); }
 
 private:
@@ -290,6 +288,7 @@ PYBIND11_MODULE(_dwarf, m) {
     py::class_<PyDWARFTypePrinter>(m, "DWARFTypePrinter")
         .def(py::init())
         .def("append_qualified_name", &PyDWARFTypePrinter::appendQualifiedName)
+        .def("append_qualified_name_before", &PyDWARFTypePrinter::appendQualifiedNameBefore)
         .def("append_unqualified_name", &PyDWARFTypePrinter::appendUnqualifiedName)
         .def("append_unqualified_name_before", &PyDWARFTypePrinter::appendUnqualifiedNameBefore)
         .def("append_unqualified_name_after", &PyDWARFTypePrinter::appendUnqualifiedNameAfter)
