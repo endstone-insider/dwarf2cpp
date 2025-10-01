@@ -51,6 +51,14 @@ public:
         return units;
     }
 
+    [[nodiscard]] auto types_section_units() const {
+        std::vector<llvm::DWARFUnit *> units;
+        for (const auto &unit : context_->types_section_units()) {
+            units.push_back(unit.get());
+        }
+        return units;
+    }
+
     [[nodiscard]] auto compile_units() const {
         std::vector<llvm::DWARFUnit *> units;
         for (const auto &unit : context_->compile_units()) {
@@ -134,6 +142,9 @@ PYBIND11_MODULE(_dwarf, m) {
         .def_property_readonly("info_section_units",
                                &PyDWARFContext::info_section_units,
                                py::return_value_policy::reference_internal)
+        .def_property_readonly("types_section_units",
+                               &PyDWARFContext::types_section_units,
+                               py::return_value_policy::reference_internal)
         .def_property_readonly("compile_units",
                                &PyDWARFContext::compile_units,
                                py::return_value_policy::reference_internal)
@@ -147,7 +158,9 @@ PYBIND11_MODULE(_dwarf, m) {
         .def_property_readonly("cu_addr_size", &PyDWARFContext::getCUAddrSize);
 
     py::class_<llvm::DWARFUnit>(m, "DWARFUnit")
+        .def_property_readonly("offset", &llvm::DWARFUnit::getOffset)
         .def_property_readonly("length", &llvm::DWARFUnit::getLength)
+        .def_property_readonly("is_type_unit", &llvm::DWARFUnit::isTypeUnit)
         .def_property_readonly("unit_die",
                                [](llvm::DWARFUnit &self) -> std::optional<llvm::DWARFDie> {
                                    if (auto die = self.getUnitDIE(false); die.isValid()) {
@@ -158,6 +171,7 @@ PYBIND11_MODULE(_dwarf, m) {
         .def_property_readonly("compilation_dir", &llvm::DWARFUnit::getCompilationDir);
 
     py::class_<llvm::DWARFDie>(m, "DWARFDie")
+        .def_property_readonly("unit", &llvm::DWARFDie::getDwarfUnit)
         .def_property_readonly("offset", &llvm::DWARFDie::getOffset)
         .def_property_readonly(
             "tag", [](const llvm::DWARFDie &self) { return TagString(self.getTag()).str(); })
