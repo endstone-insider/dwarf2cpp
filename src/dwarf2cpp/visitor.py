@@ -1,5 +1,4 @@
 import copy
-import functools
 import logging
 import posixpath
 import struct
@@ -38,23 +37,6 @@ from .models import (
 logger = logging.getLogger("dwarf2cpp")
 
 
-@functools.cache
-def get_qualified_type(die: DWARFDie, split=False) -> str | tuple[str, str]:
-    printer = DWARFTypePrinter()
-    if not split:
-        printer.append_qualified_name(die)
-        ty = str(printer).strip()
-        return ty
-    else:
-        inner = printer.append_qualified_name_before(die)
-        before = str(printer).strip()
-
-        printer = DWARFTypePrinter()
-        printer.append_unqualified_name_after(die, inner)
-        after = str(printer).strip()
-        return before, after
-
-
 def float_to_str(value: float) -> str:
     s = f"{value:.7f}".rstrip("0")
     if s[-1] == ".":
@@ -82,6 +64,7 @@ class Visitor:
         self._param_names: dict[str, list[str]] = {}
         self._functions: dict[str, list[Function]] = defaultdict(list)
         self._templates: dict[str | int, dict[int, list[Template]]] = defaultdict(lambda: defaultdict(list))
+        self._types = {}
 
     @property
     def files(self) -> Generator[tuple[str, dict[int, list[Object]]], None, None]:
@@ -149,6 +132,12 @@ class Visitor:
         func(die)
 
     def visit_compile_unit(self, die: DWARFDie):
+        self._handle_unit(die)
+
+    def visit_type_unit(self, die: DWARFDie):
+        self._handle_unit(die)
+
+    def _handle_unit(self, die: DWARFDie):
         """Visit a compile unit"""
         for child in die.children:
             if child.tag == "DW_TAG_namespace":
@@ -281,7 +270,7 @@ class Visitor:
                 value.is_implicit = True
                 typedef.value = value
             else:
-                typedef.value = get_qualified_type(type_die)
+                typedef.value = self._resolve_type(type_die)
 
         for attribute in die.attributes:
             if attribute.name in {
@@ -324,7 +313,7 @@ class Visitor:
 
             match attribute.name:
                 case "DW_AT_type":
-                    enum.base = get_qualified_type(attribute.value.as_referenced_die().resolve_type_unit_reference())
+                    enum.base = self._resolve_type(attribute.value.as_referenced_die())
                 case "DW_AT_enum_class":
                     enum.is_class = True
                 case _:
@@ -416,7 +405,7 @@ class Visitor:
             name = die.short_name
             returns = "void"
             if ret := die.find("DW_AT_type"):
-                returns = get_qualified_type(ret.as_referenced_die().resolve_type_unit_reference())
+                returns = self._resolve_type(ret.as_referenced_die())
 
             function = Function(name=name, returns=returns)
 
@@ -505,9 +494,7 @@ class Visitor:
 
                     parameter = Parameter(
                         name=child.short_name,
-                        type=get_qualified_type(
-                            child.find("DW_AT_type").as_referenced_die().resolve_type_unit_reference(), split=True
-                        ),
+                        type=self._resolve_type(child.find("DW_AT_type").as_referenced_die(), split=True),
                         kind=ParameterKind.POSITIONAL,
                     )
                     function.parameters.append(parameter)
@@ -585,7 +572,7 @@ class Visitor:
         if import_die.tag == "DW_TAG_namespace":
             imported_decl = ImportedDeclaration(name=die.short_name, import_=import_)
         else:
-            imported_decl = ImportedDeclaration(name="", import_=get_qualified_type(import_die))
+            imported_decl = ImportedDeclaration(name="", import_=self._resolve_type(import_die))
 
         assert imported_decl.import_ is not None, "Expected valid import."
 
@@ -608,7 +595,7 @@ class Visitor:
         # A template type parameter entry has a DW_AT_type attribute
         # describing the actual type by which the formal is replaced.
         if ty := die.find("DW_AT_type"):
-            param.type = get_qualified_type(ty.as_referenced_die().resolve_type_unit_reference())
+            param.type = self._resolve_type(ty.as_referenced_die())
         else:
             param.type = "void"
 
@@ -629,7 +616,7 @@ class Visitor:
 
     def visit_template_value_parameter(self, die: DWARFDie) -> None:
         param = TemplateParameter(TemplateParameterKind.CONSTANT, name=die.short_name)
-        param.type = get_qualified_type(die.find("DW_AT_type").as_referenced_die().resolve_type_unit_reference())
+        param.type = self._resolve_type(die.find("DW_AT_type").as_referenced_die())
 
         if value := die.find("DW_AT_const_value"):
             param.value = value.as_constant()
@@ -759,7 +746,7 @@ class Visitor:
             value.is_implicit = True
             variable.type = value
         else:
-            variable.type = get_qualified_type(ty, split=True)
+            variable.type = self._resolve_type(ty, split=True)
 
         for attribute in die.attributes:
             if attribute.name in {
@@ -922,9 +909,7 @@ class Visitor:
             match child.tag:
                 case "DW_TAG_inheritance":
                     inherit_access = None
-                    base = get_qualified_type(
-                        child.find("DW_AT_type").as_referenced_die().resolve_type_unit_reference()
-                    )
+                    base = self._resolve_type(child.find("DW_AT_type").as_referenced_die())
                     for attribute in child.attributes:
                         if attribute.name in {
                             "DW_AT_type",
@@ -966,3 +951,29 @@ class Visitor:
     def _set(self, die: DWARFDie, obj) -> None:
         assert die.offset not in self._objects[die.unit.is_type_unit]
         self._objects[die.unit.is_type_unit][die.offset] = obj
+
+    def _resolve_type(self, die: DWARFDie, split=False) -> str | tuple[str, str]:
+        die = die.resolve_type_unit_reference()
+        if die.unit.is_type_unit:
+            # TODO: visit type unit
+            pass
+
+        key = (die.unit.is_type_unit, die.offset, split)
+        if key in self._types:
+            return self._types[key]
+
+        printer = DWARFTypePrinter()
+        if not split:
+            printer.append_qualified_name(die)
+            ty = str(printer).strip()
+            self._types[key] = ty
+        else:
+            inner = printer.append_qualified_name_before(die)
+            before = str(printer).strip()
+
+            printer = DWARFTypePrinter()
+            printer.append_unqualified_name_after(die, inner)
+            after = str(printer).strip()
+            self._types[key] = (before, after)
+
+        return self._types[key]
