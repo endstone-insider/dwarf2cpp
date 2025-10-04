@@ -65,7 +65,6 @@ class Visitor:
         self._functions: dict[str, list[Function]] = defaultdict(list)
         self._templates: dict[str | int, dict[int, list[Template]]] = defaultdict(lambda: defaultdict(list))
         self._types = {}
-        self._visited_type_units = set()
 
     @property
     def files(self) -> Generator[tuple[str, dict[int, list[Object]]], None, None]:
@@ -76,6 +75,15 @@ class Visitor:
         Returns:
             List of files
         """
+        for i, tu in tqdm(
+            enumerate(self.context.types_section_units),
+            desc="Visiting type units",
+            total=self.context.num_type_units,
+            bar_format="[{n_fmt}/{total_fmt}] {desc} [{elapsed}, {rate_fmt}]",
+        ):
+            tu_die = tu.unit_die
+            self.visit(tu_die)
+
         for i, cu in (
             pbar := tqdm(
                 enumerate(self.context.compile_units),
@@ -957,20 +965,6 @@ class Visitor:
 
     def _resolve_type(self, die: DWARFDie, split=False) -> str | tuple[str, str]:
         die = die.resolve_type_unit_reference()
-
-        # resolve and visit type unit if needed
-        t = die
-        while True:
-            if t.unit.is_type_unit:
-                tu_die = t.unit.unit_die
-                if tu_die.offset not in self._visited_type_units:
-                    self._visited_type_units.add(tu_die.offset)
-                    self.visit(tu_die)
-
-            if ty := t.find("DW_AT_type"):
-                t = ty.as_referenced_die().resolve_type_unit_reference()
-            else:
-                break
 
         key = (die.unit.is_type_unit, die.offset, split)
         if key in self._types:
