@@ -3,7 +3,7 @@ import logging
 import posixpath
 import struct
 from collections import defaultdict
-from typing import Callable, Generator
+from typing import Any, Callable, Generator
 
 from tqdm import tqdm
 
@@ -60,11 +60,12 @@ class Visitor:
         self.context = context
         self._files: dict[str, dict[int, list[Object]]] = defaultdict(lambda: defaultdict(list))
         self._base_dir = base_dir
-        self._objects = defaultdict(dict)
+        self._objects = {}
         self._param_names: dict[str, list[str]] = {}
         self._functions: dict[str, list[Function]] = defaultdict(list)
         self._templates: dict[str | int, dict[int, list[Template]]] = defaultdict(lambda: defaultdict(list))
         self._types = {}
+        self._visited_type_units = set()
 
     @property
     def files(self) -> Generator[tuple[str, dict[int, list[Object]]], None, None]:
@@ -945,18 +946,31 @@ class Visitor:
                 self.visit(template_param)
                 struct.template.parameters.append(self._get(template_param))
 
-    def _get(self, die: DWARFDie):
-        return self._objects[die.unit.is_type_unit].get(die.offset, None)
+    def _get(self, die: DWARFDie) -> Any | None:
+        key = (die.unit.is_type_unit, die.offset)
+        return self._objects.get(key, None)
 
     def _set(self, die: DWARFDie, obj) -> None:
-        assert die.offset not in self._objects[die.unit.is_type_unit]
-        self._objects[die.unit.is_type_unit][die.offset] = obj
+        key = (die.unit.is_type_unit, die.offset)
+        assert key not in self._objects
+        self._objects[key] = obj
 
     def _resolve_type(self, die: DWARFDie, split=False) -> str | tuple[str, str]:
         die = die.resolve_type_unit_reference()
-        if die.unit.is_type_unit:
-            # TODO: visit type unit
-            pass
+
+        # resolve and visit type unit if needed
+        t = die
+        while True:
+            if t.unit.is_type_unit:
+                tu_die = t.unit.unit_die
+                if tu_die.offset not in self._visited_type_units:
+                    self._visited_type_units.add(tu_die.offset)
+                    self.visit(tu_die)
+
+            if ty := t.find("DW_AT_type"):
+                t = ty.as_referenced_die().resolve_type_unit_reference()
+            else:
+                break
 
         key = (die.unit.is_type_unit, die.offset, split)
         if key in self._types:
