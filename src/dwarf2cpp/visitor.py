@@ -346,21 +346,21 @@ class Visitor:
         if die.find("DW_AT_signature"):
             sig = die.resolve_type_unit_reference()
             self.visit(sig)
-            cls = copy.copy(self._get(sig))
+            union = copy.copy(self._get(sig))
         else:
-            cls = Union(name=die.short_name)
+            union = Union(name=die.short_name)
 
-        self._handle_struct(die, cls)
+        self._handle_struct(die, union)
 
     def visit_structure_type(self, die: DWARFDie) -> None:
         if die.find("DW_AT_signature"):
             sig = die.resolve_type_unit_reference()
             self.visit(sig)
-            cls = copy.copy(self._get(sig))
+            struct = copy.copy(self._get(sig))
         else:
-            cls = Struct(name=die.short_name)
+            struct = Struct(name=die.short_name)
 
-        self._handle_struct(die, cls)
+        self._handle_struct(die, struct)
 
     def visit_variable(self, die: DWARFDie) -> None:
         self._handle_attribute(die)
