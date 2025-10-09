@@ -241,7 +241,7 @@ class Visitor:
 
                 self.visit(child)
                 if member := self._get(child):
-                    assert member.parent is None, "Already has a parent"
+                    assert member.parent is None or member.parent.name == namespace.name, "Already has a parent"
                     member.parent = namespace
                     if template := member.template:
                         template.parent = namespace
@@ -292,14 +292,22 @@ class Visitor:
         self._set(die, typedef)
 
     def visit_class_type(self, die: DWARFDie) -> None:
-        self._handle_struct(
-            die,
-            Class(name=die.short_name),
-        )
-        self.visit(die.resolve_type_unit_reference())
+        if die.find("DW_AT_signature"):
+            sig = die.resolve_type_unit_reference()
+            self.visit(sig)
+            cls = copy.copy(self._get(sig))
+        else:
+            cls = Class(name=die.short_name)
+
+        self._handle_struct(die, cls)
 
     def visit_enumeration_type(self, die: DWARFDie) -> None:
-        enum = Enum(name=die.short_name)
+        if die.find("DW_AT_signature"):
+            sig = die.resolve_type_unit_reference()
+            self.visit(sig)
+            enum = copy.copy(self._get(sig))
+        else:
+            enum = Enum(name=die.short_name)
 
         for attribute in die.attributes:
             if attribute.name in {
@@ -333,21 +341,26 @@ class Visitor:
                     raise ValueError(f"Unhandled child tag {child.tag}")
 
         self._set(die, enum)
-        self.visit(die.resolve_type_unit_reference())
 
     def visit_union_type(self, die: DWARFDie) -> None:
-        self._handle_struct(
-            die,
-            Union(name=die.short_name),
-        )
-        self.visit(die.resolve_type_unit_reference())
+        if die.find("DW_AT_signature"):
+            sig = die.resolve_type_unit_reference()
+            self.visit(sig)
+            cls = copy.copy(self._get(sig))
+        else:
+            cls = Union(name=die.short_name)
+
+        self._handle_struct(die, cls)
 
     def visit_structure_type(self, die: DWARFDie) -> None:
-        self._handle_struct(
-            die,
-            Struct(name=die.short_name),
-        )
-        self.visit(die.resolve_type_unit_reference())
+        if die.find("DW_AT_signature"):
+            sig = die.resolve_type_unit_reference()
+            self.visit(sig)
+            cls = copy.copy(self._get(sig))
+        else:
+            cls = Struct(name=die.short_name)
+
+        self._handle_struct(die, cls)
 
     def visit_variable(self, die: DWARFDie) -> None:
         self._handle_attribute(die)
