@@ -1,5 +1,7 @@
 #include "type_printer.h"
 
+#include <llvm/ADT/SmallSet.h>
+#include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/StringSwitch.h>
 #include <llvm/DebugInfo/DWARF/DWARFContext.h>
 #include <llvm/DebugInfo/DWARF/DWARFTypeUnit.h>
@@ -31,6 +33,63 @@ llvm::dwarf::Attribute ToAttribute(const std::string &key) {
     };
     return map.at(key);
 }
+
+// POLYFILL BEGINS TODO: remove after updating to LLVM 20
+llvm::DWARFDie getAttributeValueAsReferencedDie(const llvm::DWARFDie &die,
+                                                const llvm::DWARFFormValue &V) {
+    llvm::DWARFDie Result;
+    if (std::optional<uint64_t> Offset = V.getAsRelativeReference()) {
+        Result = const_cast<llvm::DWARFUnit *>(V.getUnit())
+                     ->getDIEForOffset(V.getUnit()->getOffset() + *Offset);
+    } else if (Offset = V.getAsDebugInfoReference(); Offset) {
+        if (llvm::DWARFUnit *SpecUnit
+            = die.getDwarfUnit()->getUnitVector().getUnitForOffset(*Offset))
+            Result = SpecUnit->getDIEForOffset(*Offset);
+    } else if (std::optional<uint64_t> Sig = V.getAsSignatureReference()) {
+        if (llvm::DWARFTypeUnit *TU = die.getDwarfUnit()->getContext().getTypeUnitForHash(
+                die.getDwarfUnit()->getVersion(), *Sig, die.getDwarfUnit()->isDWOUnit()))
+            Result = TU->getDIEForOffset(TU->getTypeOffset() + TU->getOffset());
+    }
+    return Result;
+}
+
+llvm::DWARFDie getAttributeValueAsReferencedDie(const llvm::DWARFDie &die,
+                                                llvm::dwarf::Attribute Attr) {
+    if (std::optional<llvm::DWARFFormValue> F = die.find(Attr))
+        return getAttributeValueAsReferencedDie(die, *F);
+    return {};
+}
+
+std::optional<llvm::DWARFFormValue> findRecursively(const llvm::DWARFDie &die,
+                                                    llvm::ArrayRef<llvm::dwarf::Attribute> Attrs) {
+    // polyfill from LLVM 20
+    llvm::SmallVector<llvm::DWARFDie, 3> Worklist;
+    Worklist.push_back(die);
+    llvm::SmallSet<llvm::DWARFDie, 3> Seen;
+    Seen.insert(die);
+
+    while (!Worklist.empty()) {
+        llvm::DWARFDie Die = Worklist.pop_back_val();
+        if (!Die.isValid()) {
+            continue;
+        }
+        if (auto Value = Die.find(Attrs)) {
+            return Value;
+        }
+        for (llvm::dwarf::Attribute Attr : {llvm::dwarf::DW_AT_abstract_origin,
+                                            llvm::dwarf::DW_AT_specification,
+                                            llvm::dwarf::DW_AT_signature}) {
+            if (auto D = getAttributeValueAsReferencedDie(Die, Attr)) {
+                if (Seen.insert(D).second) {
+                    Worklist.push_back(D);
+                }
+            }
+        }
+    }
+
+    return std::nullopt;
+};
+// POLYFILL ENDS TODO: remove after updating to LLVM 20
 } // namespace
 
 class PyDWARFContext {
@@ -180,13 +239,28 @@ PYBIND11_MODULE(_dwarf, m) {
                                    }
                                    return std::nullopt;
                                })
-        .def_property_readonly("short_name", &llvm::DWARFDie::getShortName)
-        .def_property_readonly("linkage_name", &llvm::DWARFDie::getLinkageName)
-        .def_property_readonly("decl_line", &llvm::DWARFDie::getDeclLine)
+        .def_property_readonly("short_name",
+                               [](const llvm::DWARFDie &self) {
+                                   return llvm::dwarf::toString(
+                                       findRecursively(self, llvm::dwarf::DW_AT_name), nullptr);
+                               })
+        .def_property_readonly("linkage_name",
+                               [](const llvm::DWARFDie &self) {
+                                   return llvm::dwarf::toString(
+                                       findRecursively(self,
+                                                       {llvm::dwarf::DW_AT_MIPS_linkage_name,
+                                                        llvm::dwarf::DW_AT_linkage_name}),
+                                       nullptr);
+                               })
+        .def_property_readonly("decl_line",
+                               [](const llvm::DWARFDie &self) {
+                                   return llvm::dwarf::toUnsigned(
+                                       findRecursively(self, llvm::dwarf::DW_AT_decl_line), 0);
+                               })
         .def_property_readonly(
             "decl_file",
             [](const llvm::DWARFDie &self) -> std::optional<std::string> {
-                if (auto form = self.findRecursively(llvm::dwarf::DW_AT_decl_file))
+                if (auto form = findRecursively(self, llvm::dwarf::DW_AT_decl_file))
                     return form->getAsFile(
                         llvm::DILineInfoSpecifier::FileLineInfoKind::AbsoluteFilePath);
                 return std::nullopt;
