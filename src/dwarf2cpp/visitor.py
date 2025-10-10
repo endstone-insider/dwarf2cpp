@@ -760,16 +760,18 @@ class Visitor:
 
             match attribute.name:
                 case "DW_AT_const_value":
-                    int_value = attribute.value.as_constant()
+                    val = attribute.value.as_constant()
                     t = variable.type[0]
                     if t.endswith("float"):
-                        variable.default_value = float_to_str(struct.unpack("f", struct.pack("I", int_value))[0])
+                        variable.default_value = float_to_str(struct.unpack("f", struct.pack("I", val))[0])
                     elif t.endswith("double"):
-                        variable.default_value = double_to_str(struct.unpack("d", struct.pack("Q", int_value))[0])
+                        variable.default_value = double_to_str(struct.unpack("d", struct.pack("Q", val))[0])
+                    elif t.endswith("char") and 32 <= val < 127:
+                        variable.default_value = f"'{chr(val)}'"
                     elif t.endswith("bool"):
-                        variable.default_value = "true" if bool(int_value) else "false"
+                        variable.default_value = "true" if bool(val) else "false"
                     else:
-                        variable.default_value = int_value
+                        variable.default_value = val
 
                 case "DW_AT_alignment":
                     variable.alignment = attribute.value.as_constant()
