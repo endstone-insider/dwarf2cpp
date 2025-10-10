@@ -2,6 +2,7 @@ import copy
 import logging
 import posixpath
 import struct
+import typing
 from collections import defaultdict
 from typing import Any, Callable, Generator
 
@@ -292,14 +293,7 @@ class Visitor:
         self._set(die, typedef)
 
     def visit_class_type(self, die: DWARFDie) -> None:
-        if die.find("DW_AT_signature"):
-            sig = die.resolve_type_unit_reference()
-            self.visit(sig)
-            cls = copy.copy(self._get(sig))
-        else:
-            cls = Class(name=die.short_name)
-
-        self._handle_struct(die, cls)
+        self._handle_struct(die, Class)
 
     def visit_enumeration_type(self, die: DWARFDie) -> None:
         if die.find("DW_AT_signature"):
@@ -343,24 +337,10 @@ class Visitor:
         self._set(die, enum)
 
     def visit_union_type(self, die: DWARFDie) -> None:
-        if die.find("DW_AT_signature"):
-            sig = die.resolve_type_unit_reference()
-            self.visit(sig)
-            union = copy.copy(self._get(sig))
-        else:
-            union = Union(name=die.short_name)
-
-        self._handle_struct(die, union)
+        self._handle_struct(die, Union)
 
     def visit_structure_type(self, die: DWARFDie) -> None:
-        if die.find("DW_AT_signature"):
-            sig = die.resolve_type_unit_reference()
-            self.visit(sig)
-            struct = copy.copy(self._get(sig))
-        else:
-            struct = Struct(name=die.short_name)
-
-        self._handle_struct(die, struct)
+        self._handle_struct(die, Struct)
 
     def visit_variable(self, die: DWARFDie) -> None:
         self._handle_attribute(die)
@@ -828,7 +808,17 @@ class Visitor:
 
         self._set(die, variable)
 
-    def _handle_struct(self, die: DWARFDie, struct: Struct) -> None:
+    def _handle_struct(self, die: DWARFDie, ty: typing.Type[Class | Struct | Union]) -> None:
+        signature = die.find("DW_AT_signature")
+        if signature is not None:
+            signature = die.resolve_type_unit_reference()
+            self.visit(signature)
+            declaration = self._get(signature)
+            assert declaration is not None, "Expected valid declaration"
+            struct = copy.deepcopy(declaration)
+        else:
+            struct: Class | Struct | Union = ty(name=die.short_name)
+
         class_name = struct.name.split("<", maxsplit=1)[0] if struct.name else None
         access = AccessAttribute.PRIVATE if isinstance(struct, Class) else AccessAttribute.PUBLIC
 
