@@ -385,17 +385,8 @@ class Visitor:
 
             op = die.find("DW_AT_object_pointer")
             if not op:
-                # check if we have object pointer (i.e., this), if not, then this is a static member function
+                # check if we have the object pointer (i.e., this), if not, then this is a static member function
                 declaration.is_static = True
-            else:
-                op = op.as_referenced_die()
-                t = op.find("DW_AT_type")
-                while t:
-                    t = t.as_referenced_die().resolve_type_unit_reference()
-                    if t.tag == "DW_TAG_const_type":
-                        declaration.is_const = True
-                        break
-                    t = t.find("DW_AT_type")
 
             # this is a definition outside the body of the namespace, use fully qualified name
             printer = DWARFTypePrinter()
@@ -505,7 +496,20 @@ class Visitor:
             match child.tag:
                 case "DW_TAG_formal_parameter":
                     if child.find("DW_AT_artificial"):
-                        continue  # ignore compiler-generated implicit parameters (e.g. vtt)
+                        # this is likely to be the `this` pointer, check for constness
+                        if not function.is_const and is_member_function:
+                            t = child.find("DW_AT_type").as_referenced_die().resolve_type_unit_reference()
+                            # --- check 1: it should be a pointer_type for the `this` pointer
+                            if t is None or t.tag != "DW_TAG_pointer_type":
+                                continue
+                            # --- check 2: it should also include a const qualifier, i.e., it should be const_type
+                            t = t.find("DW_AT_type").as_referenced_die().resolve_type_unit_reference()
+                            if t is None or t.tag != "DW_TAG_const_type":
+                                continue
+                            function.is_const = True
+
+                        # always ignore compiler-generated implicit parameters (e.g., this pointer / vtt)
+                        continue
 
                     parameter = Parameter(
                         name=child.short_name,
