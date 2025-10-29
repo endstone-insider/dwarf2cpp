@@ -286,6 +286,8 @@ class Visitor:
             match attribute.name:
                 case "DW_AT_alignment":
                     typedef.alignment = attribute.value.as_constant()
+                case "DW_AT_accessibility":
+                    typedef.access = AccessAttribute(attribute.value.as_constant())
                 case _:
                     print(die.dump())
                     raise ValueError(f"Unhandled attribute {attribute.name}")
@@ -668,14 +670,16 @@ class Visitor:
 
     def visit_GNU_template_template_param(self, die: DWARFDie) -> None:
         param = TemplateParameter(TemplateParameterKind.TEMPLATE, name=die.short_name)
+        if value := die.find("DW_AT_GNU_template_name"):
+            param.type = value.as_string()
 
         for attribute in die.attributes:
-            if attribute.name in {"DW_AT_name"}:
+            if attribute.name in {"DW_AT_name", "DW_AT_GNU_template_name"}:
                 continue
 
             match attribute.name:
-                case "DW_AT_GNU_template_name":
-                    param.type = attribute.value.as_string()
+                case "DW_AT_default_value":
+                    param.default = param.type
                 case _:
                     raise ValueError(f"Unhandled attribute {attribute.name}")
 
@@ -752,6 +756,7 @@ class Visitor:
                 "DW_AT_location",
                 "DW_AT_declaration",
                 "DW_AT_byte_size",
+                "DW_AT_data_bit_offset",
                 "DW_AT_bit_offset",
                 "DW_AT_specification",
                 "DW_AT_type",
