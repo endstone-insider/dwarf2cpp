@@ -358,6 +358,16 @@ class Visitor:
         if not die.find("DW_AT_decl_file") or not die.find("DW_AT_decl_line") or not die.short_name:
             return
 
+        if die.parent and die.parent.tag in {
+            "DW_TAG_class_type",
+            "DW_TAG_enumeration_type",
+            "DW_TAG_union_type",
+            "DW_TAG_structure_type",
+        }:
+            is_member_function = True
+        else:
+            is_member_function = False
+
         # If a type, variable, or function declared in a namespace is defined outside the body of the namespace
         # declaration, that type, variable, or function definition entry has a DW_AT_specification attribute whose
         # value is a reference to the debugging information entry representing the declaration of the type, variable
@@ -514,20 +524,7 @@ class Visitor:
         if die.linkage_name:
             # c++ functions with external linkage
             key = f"{die.linkage_name}@{len(function.parameters)}"
-        elif (
-            die.find("DW_AT_external")
-            and (
-                not die.parent
-                or die.parent.tag
-                not in {
-                    "DW_TAG_class_type",
-                    "DW_TAG_enumeration_type",
-                    "DW_TAG_union_type",
-                    "DW_TAG_structure_type",
-                }
-            )
-            and die.short_name
-        ):
+        elif die.find("DW_AT_external") and not is_member_function and die.short_name:
             # c functions with external linkage
             key = f"{die.short_name}@{len(function.parameters)}"
 
