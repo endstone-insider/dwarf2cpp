@@ -403,6 +403,15 @@ class Visitor:
             if ret := die.find("DW_AT_type"):
                 returns = self._resolve_type(ret.as_referenced_die())
 
+            if name is not None:
+                # constructors, destructors and operators should have no return type
+                if name.startswith("operator "):
+                    returns = None
+                elif class_name := die.parent.short_name.split("<", maxsplit=1)[0] if die.parent.short_name else None:
+                    function_name = name.split("<", maxsplit=1)[0]
+                    if function_name == class_name or function_name == f"~{class_name}":
+                        returns = None
+
             function = Function(name=name, returns=returns)
 
         for attribute in die.attributes:
@@ -505,7 +514,20 @@ class Visitor:
         if die.linkage_name:
             # c++ functions with external linkage
             key = f"{die.linkage_name}@{len(function.parameters)}"
-        elif die.find("DW_AT_external") and die.short_name:
+        elif (
+            die.find("DW_AT_external")
+            and (
+                not die.parent
+                or die.parent.tag
+                not in {
+                    "DW_TAG_class_type",
+                    "DW_TAG_enumeration_type",
+                    "DW_TAG_union_type",
+                    "DW_TAG_structure_type",
+                }
+            )
+            and die.short_name
+        ):
             # c functions with external linkage
             key = f"{die.short_name}@{len(function.parameters)}"
 
@@ -826,7 +848,6 @@ class Visitor:
         else:
             struct: Class | Struct | Union = ty(name=die.short_name)
 
-        class_name = struct.name.split("<", maxsplit=1)[0] if struct.name else None
         access = AccessAttribute.PRIVATE if isinstance(struct, Class) else AccessAttribute.PUBLIC
 
         for attribute in die.attributes:
@@ -896,16 +917,6 @@ class Visitor:
                         lines.append(template)
 
                 lines.append(member)
-
-                if isinstance(member, Function):
-                    # constructors, destructors and operators should have no return type
-                    if child.short_name.startswith("operator "):
-                        member.returns = None
-                    elif class_name and child.short_name:
-                        function_name = child.short_name.split("<", maxsplit=1)[0]
-                        if function_name == class_name or function_name == f"~{class_name}":
-                            member.returns = None
-
                 continue
 
             if child.tag in {
