@@ -383,10 +383,9 @@ class Visitor:
             if not declaration:
                 return
 
-            op = die.find("DW_AT_object_pointer")
-            if not op:
+            if die.find("DW_AT_object_pointer"):
                 # check if we have the object pointer (i.e., this), if not, then this is a static member function
-                declaration.is_static = True
+                assert not declaration.is_static, "Expect non-static member function."
 
             # this is a definition outside the body of the namespace, use fully qualified name
             printer = DWARFTypePrinter()
@@ -413,7 +412,8 @@ class Visitor:
                     if function_name == class_name or function_name == f"~{class_name}":
                         returns = None
 
-            function = Function(name=name, returns=returns)
+            # for member function, we set is_static to True by default, unless we find the `this` pointer later
+            function = Function(name=name, returns=returns, is_static=is_member_function)
 
         for attribute in die.attributes:
             if attribute.name in {
@@ -465,6 +465,7 @@ class Visitor:
                     raise ValueError(f"Unhandled attribute {attribute.name}")
 
         template_params = []
+        first_param_seen = False
         for child in die.children:
             if child.tag in {
                 "DW_TAG_label",
@@ -495,9 +496,12 @@ class Visitor:
 
             match child.tag:
                 case "DW_TAG_formal_parameter":
+                    is_first_param = not first_param_seen
+                    first_param_seen = True
                     if child.find("DW_AT_artificial"):
                         # this is likely to be the `this` pointer, check for constness
-                        if not function.is_const and is_member_function:
+                        if is_first_param and is_member_function:
+                            function.is_static = False
                             t = child.find("DW_AT_type").as_referenced_die().resolve_type_unit_reference()
                             # --- check 1: it should be a pointer_type for the `this` pointer
                             if t is None or t.tag != "DW_TAG_pointer_type":
